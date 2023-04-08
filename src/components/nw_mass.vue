@@ -1,5 +1,5 @@
 <template>
-    <div style="position: relative;" id="chart">
+    <div style="position: relative; z-index: 999;" id="chart">
         <div id="echarts" style="width: 500px; height: 380px; background-color: white;"></div>
         <input type="button" value="关闭" @click="close"
             style="position: absolute; top: 5px; left: 450px; background-color: transparent;">
@@ -17,7 +17,7 @@ function close() {
 
 Promise.all([
     fetch('./src/data/nw_Grace_mass.json').then(response => response.json()),
-    fetch('./src/data/nw_SMB_mass.json').then(response => response.json())
+    fetch('./src/data/nw_MBM_mass.json').then(response => response.json())
 ]).then(([GraceData, SMBData]) => {
 
     // 初始化echarts实例

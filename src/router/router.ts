@@ -29,6 +29,26 @@ const routes = [
         path: '/greenland',
         component: () => import('../components/greenland_mass.vue')
     },
+    {
+        path: '/GraceVel',
+        component: () => import('../components/GraceVel.vue')
+    },
+    {
+        path: '/ERate',
+        component: () => import('../components/ERate.vue')
+    },
+    {
+        path: '/RRate',
+        component: () => import('../components/RRate.vue')
+    },
+    {
+        path: '/SMBRate',
+        component: () => import('../components/SMBRate.vue')
+    },
+    {
+        path: '/PRate',
+        component: () => import('../components/PRate.vue')
+    },
 ]
 
 const router = createRouter({

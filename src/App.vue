@@ -3,7 +3,6 @@
   <div>
     <router-view></router-view>
   </div>
-  <div id="colorbar"></div>
 </template>
 <script>
 import mapboxgl from 'mapbox-gl';
@@ -15,10 +14,10 @@ export default {
     const map = new mapboxgl.Map({
       container: 'map',
       style: 'mapbox://styles/mapbox/light-v10', //地图样式
-      center: [-42.6043, 76.7069], //格陵兰岛中心点坐标
+      center: [-42.6043, 90], //格陵兰岛中心点坐标
       zoom: 2.2, //缩放大小
       scrollZoom: false, // 禁用滚动缩放功能
-      dragPan: false,
+      dragPan: false, //禁止移动地图
     });
     map.on('load', function () {
       //添加流域边界数据
@@ -52,17 +51,17 @@ export default {
         data: './src/data/sw_boundary.json'
       });
 
-      //添加点的质量变化速度数据
-      map.addSource('GreenlandVel', {
+      //添加Grace_vel数据
+      map.addSource('Grace_Vel', {
         type: 'geojson',
-        data: './src/data/Vel.json'
+        data: './src/data/Grace_vel.json'
       });
 
-      //把点上的质量变化速度在图上绘制出来
+      //在地图上显示出Grace_vel图像
       map.addLayer({
-        id: 'Vel',
+        id: 'Grace_Vel',
         type: 'circle',
-        source: 'GreenlandVel',
+        source: 'Grace_Vel',
         paint: {
           'circle-radius': 8,
           // 使用插值函数将速度属性值映射到一个颜色值范围内
@@ -70,66 +69,165 @@ export default {
             'interpolate',
             ['linear'],
             ['get', 'speed'],
-            -71, 'red',
-            8, 'white'
+            -80, 'red',
+            10, 'white'
           ]
+        },
+        layout: {
+          visibility: 'none', // 不可见
+        },
+      });
+
+      //添加E_rate数据并在地图上显示
+      map.addSource('E_rate', {
+        type: 'geojson',
+        data: './src/data/e_rate.json'
+      });
+
+      map.addLayer({
+        id: 'E_rate',
+        type: 'circle',
+        source: 'E_rate',
+        paint: {
+          'circle-radius': 4,
+          // 使用插值函数将速度属性值映射到一个颜色值范围内
+          'circle-color': [
+            'interpolate',
+            ['linear'],
+            ['get', 'speed'],
+            -40, '#FF01FF',
+            500, '#01FFFF'
+          ]
+        },
+        layout: {
+          visibility: 'none' // 不可见
         }
       });
 
-      //创建colorbar控件
-      class ColorbarControl {
-        constructor() {
-          this.container = document.createElement('div');
-          this.container.className = 'colorbar';
-          this.container.style.padding = '10px';
+      //添加R_rate数据并在地图上显示
+      map.addSource('R_rate', {
+        type: 'geojson',
+        data: './src/data/r_rate.json'
+      });
 
-
-          const colors = ['red', 'white'];
-          const intervals = [-80, 10];
-          let gradient = 'linear-gradient(to right, ';
-          const label = document.createElement('div');
-          label.innerHTML = 'Mass Change cm/year';
-          label.style.textAlign = 'center';
-          label.style.fontSize = "15px"
-          this.container.appendChild(label);
-          for (let i = 0; i < colors.length; i++) {
-            gradient += colors[i] + ' ' + ((intervals[i] - intervals[0]) / (intervals[intervals.length - 1] - intervals[0]) * 100) + '%';
-            if (i < colors.length - 1) {
-              gradient += ', ';
-            }
-            // 添加数字标签
-            const label = document.createElement('div');
-            label.innerHTML = intervals[i];
-            label.style.position = 'absolute';
-            label.style.bottom = '-10px';
-            label.style.left = (i / (colors.length - 1) * 100) + '%';
-            label.style.transform = 'translate(-50%, 0%)';
-            label.style.fontSize = '15px';
-            label.style.color = 'black';
-            this.container.appendChild(label);
-          }
-          gradient += ')';
-
-          const colorbar = document.createElement('div');
-          colorbar.style.background = gradient;
-          colorbar.style.width = '220px';
-          colorbar.style.height = '15px';
-          this.container.appendChild(colorbar);
+      map.addLayer({
+        id: 'R_rate',
+        type: 'circle',
+        source: 'R_rate',
+        paint: {
+          'circle-radius': 4,
+          // 使用插值函数将速度属性值映射到一个颜色值范围内
+          'circle-color': [
+            'interpolate',
+            ['linear'],
+            ['get', 'speed'],
+            0, '#FF01FF',
+            5300, '#01FFFF'
+          ]
+        },
+        layout: {
+          visibility: 'none' // 不可见
         }
+      });
 
-        onAdd(map) {
-          this.map = map;
-          return this.container;
+      //添加SMB_rate数据并在地图上显示
+      map.addSource('SMB_rate', {
+        type: 'geojson',
+        data: './src/data/smb_rate.json'
+      });
+
+      map.addLayer({
+        id: 'SMB_rate',
+        type: 'circle',
+        source: 'SMB_rate',
+        paint: {
+          'circle-radius': 4,
+          // 使用插值函数将速度属性值映射到一个颜色值范围内
+          'circle-color': [
+            'interpolate',
+            ['linear'],
+            ['get', 'speed'],
+            -40, '#FF01FF',
+            40, '#01FFFF'
+          ]
+        },
+        layout: {
+          visibility: 'none' // 不可见
         }
+      });
 
-        onRemove() {
-          this.container.parentNode.removeChild(this.container);
-          this.map = undefined;
+      //添加precipitation_rate数据并在地图上显示
+      map.addSource('precipitation_rate', {
+        type: 'geojson',
+        data: './src/data/precipitation_rate.json'
+      });
+
+      map.addLayer({
+        id: 'precipitation_rate',
+        type: 'circle',
+        source: 'precipitation_rate',
+        paint: {
+          'circle-radius': 8,
+          // 使用插值函数将速度属性值映射到一个颜色值范围内
+          'circle-color': [
+            'interpolate',
+            ['linear'],
+            ['get', 'speed'],
+            40, '#FF01FF',
+            4000, '#01FFFF'
+          ]
+        },
+        layout: {
+          visibility: 'none' // 不可见
         }
-      }
+      });
 
-      map.addControl(new ColorbarControl(), 'bottom-right');
+      map.addSource('gate_meta', {
+        type: 'geojson',
+        data: './src/data/gate_meta.json',
+      });
 
+      // 创建图层并添加到地图对象中
+      map.addLayer({
+        id: 'circles',
+        type: 'circle',
+        source: 'gate_meta',
+        paint: {
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['/', ['get', 'total_discharge'], ['get', 'num_discharge']], // 计算平均discharge
+            10, 0.01, // 如果平均discharge为0，圆盘半径为0
+            100, 0.1, // 如果平均discharge为10，圆盘半径为5
+            1000, 1 // 如果平均discharge为100，圆盘半径为10
+          ],
+          'circle-color': 'rgba(255, 99, 71, 0.7)', // 浅红色
+        }
+      });
+
+      map.on('click', 'circles-layer', (e) => {
+        const featureId = e.features[0].id; // 获取单击的要素的ID
+        const feature = map.getSource('circles-source')._data.features[featureId]; // 获取要素对象
+        const speeds = feature.properties.speeds; // 获取所有时间序列的信息
+
+        // 将时间序列的信息显示在地图上
+        const popup = new mapboxgl.Popup({ offset: [0, -15] })
+          .setLngLat(feature.geometry.coordinates)
+          .setHTML(`
+      <h3>Discharge Timeline</h3>
+      <ul>
+        ${speeds.map(speed => `<li>${speed.time}: ${speed.discharge.toFixed(2)}</li>`).join('')}
+      </ul>
+    `)
+          .addTo(map);
+      });
+
+      // 处理圆形要素的点击事件
+      map.on('click', 'circles', function (e) {
+        const speeds = e.features[0].properties.speeds;
+        // 显示速度时间序列
+        // ...
+      });
 
       //为各个流域添加边界线
       map.addLayer({
@@ -140,8 +238,8 @@ export default {
         'paint': {
           'line-color': '#FF3300'
         },
-        interactive: true,
-        clickable: true,
+        interactive: true, //可以交互
+        clickable: true, //可以点击
       });
 
       //添加各个流域名称
@@ -171,6 +269,11 @@ export default {
 
       //点击各个区域时显示出Mass Change的图表
       map.on('click', 'greenlandCw-fill', function (e) {
+        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
+        map.setLayoutProperty('E_rate', 'visibility', 'none');
+        map.setLayoutProperty('R_rate', 'visibility', 'none');
+        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         window.location.href = 'http://localhost:7070/#/cw'
       });
 
@@ -210,6 +313,11 @@ export default {
       });
 
       map.on('click', 'greenlandNe-fill', function (e) {
+        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
+        map.setLayoutProperty('E_rate', 'visibility', 'none');
+        map.setLayoutProperty('R_rate', 'visibility', 'none');
+        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         window.location.href = 'http://localhost:7070/#/ne'
       });
 
@@ -236,19 +344,24 @@ export default {
         }
       });
 
-      map.addLayer({
-        id: 'greenlandNo-fill',
-        type: 'fill',
-        source: 'greenlandNo',
-        layout: {},
-        'paint': {
-          'fill-color': 'transparent'
-        },
-        interactive: true,
-        clickable: true,
-      });
+      // map.addLayer({
+      //   id: 'greenlandNo-fill',
+      //   type: 'fill',
+      //   source: 'greenlandNo',
+      //   layout: {},
+      //   'paint': {
+      //     'fill-color': 'transparent'
+      //   },
+      //   interactive: true,
+      //   clickable: true,
+      // });
 
       map.on('click', 'greenlandNo-fill', function (e) {
+        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
+        map.setLayoutProperty('E_rate', 'visibility', 'none');
+        map.setLayoutProperty('R_rate', 'visibility', 'none');
+        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         window.location.href = 'http://localhost:7070/#/no'
       });
 
@@ -288,6 +401,11 @@ export default {
       });
 
       map.on('click', 'greenlandNw-fill', function (e) {
+        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
+        map.setLayoutProperty('E_rate', 'visibility', 'none');
+        map.setLayoutProperty('R_rate', 'visibility', 'none');
+        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         window.location.href = 'http://localhost:7070/#/nw'
       });
 
@@ -327,6 +445,11 @@ export default {
       });
 
       map.on('click', 'greenlandSe-fill', function (e) {
+        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
+        map.setLayoutProperty('E_rate', 'visibility', 'none');
+        map.setLayoutProperty('R_rate', 'visibility', 'none');
+        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         window.location.href = 'http://localhost:7070/#/se'
       });
 
@@ -366,41 +489,195 @@ export default {
       });
 
       map.on('click', 'greenlandSw-fill', function (e) {
+        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
+        map.setLayoutProperty('E_rate', 'visibility', 'none');
+        map.setLayoutProperty('R_rate', 'visibility', 'none');
+        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         window.location.href = 'http://localhost:7070/#/sw'
       });
 
+
       // 创建一个按钮元素
-      var button = document.createElement('button');
-      button.innerHTML = 'Mass Change';
-      button.style.position = 'absolute';
-      button.style.top = '10px';
-      button.style.right = '400px';
-      button.style.zIndex = '9999';
-      button.style.padding = '10px';
-      button.style.backgroundColor = '##F0F0EF';
-      button.style.color = 'gray';
-      button.style.border = 'none';
-      button.style.borderRadius = '5px';
-      button.style.fontSize = '14px';
-      button.style.cursor = 'pointer';
+      var massChangeButton = document.createElement('button');
+      massChangeButton.innerHTML = 'Mass Change';
+      massChangeButton.id = 'mass-change-button';
 
       // 将按钮添加到地图容器中
-      map.getContainer().appendChild(button);
+      map.getContainer().appendChild(massChangeButton);
 
       // 为按钮添加 click 事件处理程序
-      button.addEventListener('click', function () {
+      massChangeButton.addEventListener('click', function () {
+        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
+        map.setLayoutProperty('E_rate', 'visibility', 'none');
+        map.setLayoutProperty('R_rate', 'visibility', 'none');
+        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         // 在单击时将用户重定向到新页面
         window.location.href = 'http://localhost:7070/#/greenland';
       });
+
+      // 创建一个按钮元素
+      var graceVelButton = document.createElement('button');
+      graceVelButton.innerHTML = 'Grace Vel';
+      graceVelButton.classList.add('rate-button');
+      graceVelButton.id = 'grace-vel-button';
+
+      // 将按钮添加到地图容器中
+      map.getContainer().appendChild(graceVelButton);
+
+      // 添加点击事件监听器
+      graceVelButton.addEventListener('click', function () {
+        map.setLayoutProperty('Grace_Vel', 'visibility', 'visible');
+        map.setLayoutProperty('E_rate', 'visibility', 'none');
+        map.setLayoutProperty('R_rate', 'visibility', 'none');
+        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
+        window.location.href = 'http://localhost:7070/#/GraceVel';
+      });
+
+      // 创建一个按钮元素
+      var eRateButton = document.createElement('button');
+      eRateButton.innerHTML = 'E Rate';
+      eRateButton.classList.add('rate-button');
+      eRateButton.id = 'e-rate-button';
+
+      // 将按钮添加到地图容器中
+      map.getContainer().appendChild(eRateButton);
+
+      // 添加点击事件监听器
+      eRateButton.addEventListener('click', function () {
+        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
+        map.setLayoutProperty('E_rate', 'visibility', 'visible');
+        map.setLayoutProperty('R_rate', 'visibility', 'none');
+        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
+        window.location.href = 'http://localhost:7070/#/ERate';
+
+      });
+
+      // 创建一个按钮元素
+      var rRateButton = document.createElement('button');
+      rRateButton.innerHTML = 'R Rate';
+      rRateButton.classList.add('rate-button');
+      rRateButton.id = 'r-rate-button';
+
+      // 将按钮添加到地图容器中
+      map.getContainer().appendChild(rRateButton);
+
+      // 添加点击事件监听器
+      rRateButton.addEventListener('click', function () {
+        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
+        map.setLayoutProperty('E_rate', 'visibility', 'none');
+        map.setLayoutProperty('R_rate', 'visibility', 'visible');
+        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
+        window.location.href = 'http://localhost:7070/#/RRate';
+      });
+
+      // 创建一个按钮元素
+      var smbRateButton = document.createElement('button');
+      smbRateButton.innerHTML = 'SMB Rate';
+      smbRateButton.classList.add('rate-button');
+      smbRateButton.id = 'smb-rate-button';
+
+      // 将按钮添加到地图容器中
+      map.getContainer().appendChild(smbRateButton);
+
+      // 添加点击事件监听器
+      smbRateButton.addEventListener('click', function () {
+        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
+        map.setLayoutProperty('E_rate', 'visibility', 'none');
+        map.setLayoutProperty('R_rate', 'visibility', 'none');
+        map.setLayoutProperty('SMB_rate', 'visibility', 'visible');
+        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
+        window.location.href = 'http://localhost:7070/#/SMBRate';
+      });
+
+      // 创建一个按钮元素
+      var pRateButton = document.createElement('button');
+      pRateButton.innerHTML = 'P Rate';
+      pRateButton.classList.add('rate-button');
+      pRateButton.id = 'p-rate-button';
+
+      // 将按钮添加到地图容器中
+      map.getContainer().appendChild(pRateButton);
+
+      // 添加点击事件监听器
+      pRateButton.addEventListener('click', function () {
+        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
+        map.setLayoutProperty('E_rate', 'visibility', 'none');
+        map.setLayoutProperty('R_rate', 'visibility', 'none');
+        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+        map.setLayoutProperty('precipitation_rate', 'visibility', 'visible');
+        window.location.href = 'http://localhost:7070/#/PRate';
+      });
+
     });
   }
 }
 </script>
 <style>
-.colorbar {
+#mass-change-button {
   position: absolute;
-  bottom: 15px;
-  left: -500px;
-  transform: translateX(-50%);
+  top: 10px;
+  left: 10px;
+  height: 40px;
+  width: 120px;
+  z-index: 1;
+  padding: 10px;
+  background-color: #F0F0EF;
+  color: gray;
+  border-top: 2px solid gray;
+  border-right: 2px solid gray;
+  border-left: 2px solid gray;
+  border-bottom: 2px solid gray;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#mass-change-button:hover {
+  background-color: rgb(151, 179, 232);
+}
+
+.rate-button {
+  position: absolute;
+  left: 10px;
+  height: 40px;
+  width: 120px;
+  z-index: 1;
+  padding: 10px;
+  background-color: #F0F0EF;
+  color: gray;
+  border-top: none;
+  border-right: 2px solid gray;
+  border-left: 2px solid gray;
+  border-bottom: 2px solid gray;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.rate-button:hover {
+  background-color: rgb(151, 179, 232);
+}
+
+#grace-vel-button {
+  top: 50px;
+}
+
+#e-rate-button {
+  top: 90px;
+}
+
+#r-rate-button {
+  top: 130px;
+}
+
+#smb-rate-button {
+  top: 170px;
+}
+
+#p-rate-button {
+  top: 210px;
 }
 </style>
