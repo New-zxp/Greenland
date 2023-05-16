@@ -11,7 +11,6 @@ import jStat from 'jstat';
 import regression from 'regression';
 
 function close() {
-    // var url = 'https://3707n923f3.goho.co';
     var url = 'http://localhost:7070';
     document.getElementById('chart').style.display = 'none';
     window.location.href =  url + '/#/';
