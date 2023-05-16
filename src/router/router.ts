@@ -3,51 +3,51 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 const routes = [
     {
         path: '/cw',
-        component: () => import('../components/cw_mass.vue')
+        component: () => import('../views/cw_mass.vue')
     },
     {
         path: '/ne',
-        component: () => import('../components/ne_mass.vue')
+        component: () => import('../views/ne_mass.vue')
     },
     {
         path: '/no',
-        component: () => import('../components/no_mass.vue')
+        component: () => import('../views/no_mass.vue')
     },
     {
         path: '/nw',
-        component: () => import('../components/nw_mass.vue')
+        component: () => import('../views/nw_mass.vue')
     },
     {
         path: '/se',
-        component: () => import('../components/se_mass.vue')
+        component: () => import('../views/se_mass.vue')
     },
     {
         path: '/sw',
-        component: () => import('../components/sw_mass.vue')
+        component: () => import('../views/sw_mass.vue')
     }, 
     {
         path: '/greenland',
-        component: () => import('../components/greenland_mass.vue')
+        component: () => import('../views/greenland_mass.vue')
     },
     {
         path: '/GraceVel',
-        component: () => import('../components/GraceVel.vue')
+        component: () => import('../views/GraceVel.vue')
     },
     {
         path: '/ERate',
-        component: () => import('../components/ERate.vue')
+        component: () => import('../views/ERate.vue')
     },
     {
         path: '/RRate',
-        component: () => import('../components/RRate.vue')
+        component: () => import('../views/RRate.vue')
     },
     {
         path: '/SMBRate',
-        component: () => import('../components/SMBRate.vue')
+        component: () => import('../views/SMBRate.vue')
     },
     {
         path: '/PRate',
-        component: () => import('../components/PRate.vue')
+        component: () => import('../views/PRate.vue')
     },
 ]
 

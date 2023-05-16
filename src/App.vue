@@ -3,6 +3,7 @@
   <div>
     <router-view></router-view>
   </div>
+  <!-- <div id="discharge" style="width: 500px; height: 300px; right: 100px; position: absolute;"></div> -->
 </template>
 <script>
 import mapboxgl from 'mapbox-gl';
@@ -16,9 +17,10 @@ export default {
       container: 'map',
       style: 'mapbox://styles/mapbox/light-v10', //地图样式
       center: [-42.6043, 90], //格陵兰岛中心点坐标
-      zoom: 2.2, //缩放大小
+      zoom: 2, //缩放大小
       scrollZoom: false, // 禁用滚动缩放功能
       dragPan: false, //禁止移动地图
+      doubleClickZoom: false,
     });
     map.on('load', function () {
       //添加流域边界数据
@@ -197,13 +199,13 @@ export default {
             'interpolate',
             ['linear'],
             ['get', 'discharge_mean'],
-            0, 10, // 当 discharge_mean 为 0 时，半径为 0
-            10, 15,
+            0, 0, // 当 discharge_mean 为 0 时，半径为 0
+            5, 5,
+            10, 10,
             20, 20,
-            30, 25,
-            40, 30,
-            50, 35,
-            60, 40
+            30, 30,
+            40, 40,
+            50, 50
           ],
           'circle-color': 'rgba(255, 99, 71, 0.7)', // 浅红色
         },
@@ -214,58 +216,138 @@ export default {
         clickable: true,
       });
 
-      map.on('click', 'gate_meta', function (e) {
-        var speeds = JSON.parse(e.features[0].properties.speeds);
+      var popup = new mapboxgl.Popup({
+        closeButton: false,
+        closeOnClick: false
+      });
 
-        // 创建HTML表格
-        var table = document.createElement('table');
-        table.style.width = '180px'; // 设置表格宽度
-        var thead = document.createElement('thead');
-        var tbody = document.createElement('tbody');
-        var tr = document.createElement('tr');
+      map.on('mouseenter', 'gate_meta', function (e) {
+        var coordinates = e.features[0].geometry.coordinates.slice();
+        var glacierName = e.features[0].properties.name;
 
-        // 创建表头
-        var th1 = document.createElement('th');
-        var th2 = document.createElement('th');
-        th1.innerHTML = 'Time';
-        th2.innerHTML = 'Discharge';
-        th1.style.textAlign = 'center'; // 设置居中对齐
-        th2.style.textAlign = 'center'; // 设置居中对齐
-        tr.appendChild(th1);
-        tr.appendChild(th2);
-        thead.appendChild(tr);
-        table.appendChild(thead);
-
-        // 创建表格内容
-        speeds.forEach(function (item) {
-          var tr = document.createElement('tr');
-          var td1 = document.createElement('td');
-          var td2 = document.createElement('td');
-          td1.innerHTML = item.time;
-          td2.innerHTML = item.discharge.toFixed(5);
-          td1.style.textAlign = 'center'; // 设置居中对齐
-          td2.style.textAlign = 'center'; // 设置居中对齐
-          tr.appendChild(td1);
-          tr.appendChild(td2);
-          tbody.appendChild(tr);
-        });
-        table.appendChild(tbody);
-
-        // 创建包含表格的div
-        var container = document.createElement('div');
-        container.style.height = '300px'; // 设置固定高度
-        container.style.overflowY = 'scroll'; // 创建垂直滚动条
-        container.appendChild(table);
-
-        // 创建Mapbox弹出窗口
-        new mapboxgl.Popup()
-          .setLngLat(e.lngLat)
-          .setDOMContent(container)
+        // 设置弹出窗口的内容和位置
+        popup.setLngLat(coordinates)
+          .setHTML(glacierName)
           .addTo(map);
       });
 
-      map.on('click', 'circles', (e) => {
-        console.log("1");
+      map.on('mouseleave', 'gate_meta', function () {
+        // 鼠标离开时关闭弹出窗口
+        popup.remove();
+      });
+
+      map.on('click', 'gate_meta', function (e) {
+
+        // 移除之前创建的表格
+        var chartContainer = document.getElementById('chart-container');
+        if (chartContainer) {
+          chartContainer.parentNode.removeChild(chartContainer);
+        }
+
+        var container = document.createElement('div');
+        container.id = 'chart-container';
+        document.body.appendChild(container);
+
+        // 创建新的表格
+        var data = JSON.parse(e.features[0].properties.speeds);
+        var glacierTitle = e.features[0].properties.name;
+        var chartContainer = document.createElement('div');
+        chartContainer.setAttribute('id', 'chart');
+        chartContainer.style.width = '628px';
+        chartContainer.style.height = '400px';
+        chartContainer.style.left = '0px';
+        chartContainer.style.position = 'absolute';
+        chartContainer.style.backgroundColor = 'white';
+        chartContainer.style.zIndex = 999;
+        container.appendChild(chartContainer);
+        var myChart = echarts.init(chartContainer);
+
+        myChart.setOption({
+          title: {
+            text: glacierTitle,   // 设置标题文本
+            textStyle: {              // 标题文字样式配置
+              color: 'black',
+              fontSize: 15,
+            },
+            left: 'center',   // 设置标题水平居中
+          },
+          tooltip: {
+            trigger: "item",
+          },
+          xAxis: {
+            type: 'category',
+            data: data.map(item => item.time),
+            axisLabel: {
+              fontFamily: 'Arial', // 设置字体
+              fontSize: 15,        // 设置字号
+              color: '#333'        // 设置颜色
+            },
+            axisLine: {
+              show: false,
+            },
+            axisTick: {
+              show: false,
+            }
+          },
+          yAxis: {
+            type: 'value',
+            name: 'Discharge (Gt/yr)',
+            nameLocation: "middle",
+            nameTextStyle: {
+              fontSize: 15,
+            },
+            nameGap: 40,
+            axisLabel: {
+              fontFamily: 'Arial', // 设置字体
+              fontSize: 15,        // 设置字号
+              color: '#333'        // 设置颜色
+            },
+            axisLine: {
+              show: false,
+            },
+            axisTick: {
+              show: false,
+            }
+          },
+          grid: {
+            width: '80%',  // 设置宽度为80%
+            height: '70%',  // 设置高度为80%
+            left: '10%',
+            top: '15%',
+          },
+          series: [
+            {
+              type: 'scatter',
+              name: 'time              discharge',
+              data: data.map(item => [item.time, item.discharge]),
+              color: 'red',
+            },
+          ],
+          toolbox: {
+            feature: {
+              dataView: { readOnly: false },
+              saveAsImage: {},
+            },
+            itemSize: 18,
+            itemGap: 20,
+            right: 70,
+          },
+        });
+
+        // 创建一个按钮元素
+        var closeButton = document.createElement('button');
+        closeButton.innerHTML = '关闭';
+        closeButton.id = 'close-button';
+        closeButton.style.position = 'absolute';
+        closeButton.style.left = '580px';
+        closeButton.style.top = '5px';
+        closeButton.style.zIndex = 999;
+        // 将按钮添加到地图容器中
+        container.appendChild(closeButton);
+        // 添加点击事件监听器
+        closeButton.addEventListener('click', function () {
+          document.getElementById('chart-container').style.display = 'none';
+        });
       });
 
       //为各个流域添加边界线
@@ -304,7 +386,13 @@ export default {
         },
         interactive: true,
         clickable: true,
+        layout: {
+          visibility: 'none' // 不可见
+        }
       });
+
+      // var url = 'https://3707n923f3.goho.co';
+      var url = 'http://localhost:7070';
 
       //点击各个区域时显示出Mass Change的图表
       map.on('click', 'greenlandCw-fill', function (e) {
@@ -314,7 +402,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = 'http://localhost:7070/#/cw'
+        window.location.href = url + '/#/cw'
       });
 
       map.addLayer({
@@ -350,6 +438,9 @@ export default {
         },
         interactive: true,
         clickable: true,
+        layout: {
+          visibility: 'none' // 不可见
+        }
       });
 
       map.on('click', 'greenlandNe-fill', function (e) {
@@ -359,7 +450,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = 'http://localhost:7070/#/ne'
+        window.location.href = url + '/#/ne';
       });
 
       map.addLayer({
@@ -395,6 +486,9 @@ export default {
         },
         interactive: true,
         clickable: true,
+        layout: {
+          visibility: 'none' // 不可见
+        }
       });
 
       map.on('click', 'greenlandNo-fill', function (e) {
@@ -404,7 +498,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = 'http://localhost:7070/#/no'
+        window.location.href = url + '/#/no'
       });
 
       map.addLayer({
@@ -440,6 +534,9 @@ export default {
         },
         interactive: true,
         clickable: true,
+        layout: {
+          visibility: 'none' // 不可见
+        }
       });
 
       map.on('click', 'greenlandNw-fill', function (e) {
@@ -449,7 +546,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = 'http://localhost:7070/#/nw'
+        window.location.href = url + '/#/nw'
       });
 
       map.addLayer({
@@ -485,6 +582,9 @@ export default {
         },
         interactive: true,
         clickable: true,
+        layout: {
+          visibility: 'none' // 不可见
+        }
       });
 
       map.on('click', 'greenlandSe-fill', function (e) {
@@ -494,7 +594,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = 'http://localhost:7070/#/se'
+        window.location.href = url + '/#/se'
       });
 
       map.addLayer({
@@ -530,6 +630,9 @@ export default {
         },
         interactive: true,
         clickable: true,
+        layout: {
+          visibility: 'none' // 不可见
+        }
       });
 
       map.on('click', 'greenlandSw-fill', function (e) {
@@ -539,7 +642,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = 'http://localhost:7070/#/sw'
+        window.location.href = url + '/#/sw'
       });
 
 
@@ -553,6 +656,11 @@ export default {
 
       // 为按钮添加 click 事件处理程序
       massChangeButton.addEventListener('click', function () {
+
+        map.boxZoom.enable();
+        map.dragPan.enable();
+        map.scrollZoom.enable();
+
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'none');
         map.setLayoutProperty('R_rate', 'visibility', 'none');
@@ -567,7 +675,7 @@ export default {
         map.setLayoutProperty('greenlandSw-fill', 'visibility', 'visible');
         map.setLayoutProperty('greenlandCw-fill', 'visibility', 'visible');
         // 在单击时将用户重定向到新页面
-        window.location.href = 'http://localhost:7070/#/greenland';
+        window.location.href = url + '/#/greenland';
       });
 
       // 创建一个按钮元素
@@ -590,7 +698,7 @@ export default {
 
         // 设置地图中心点和缩放级别
         map.setCenter([-42.6043, 90]);
-        map.setZoom(2.2);
+        map.setZoom(2);
 
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'visible');
@@ -599,7 +707,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = 'http://localhost:7070/#/GraceVel';
+        window.location.href = url + '/#/GraceVel';
       });
 
       // 创建一个按钮元素
@@ -621,7 +729,7 @@ export default {
         map.doubleClickZoom.disable();
         // 设置地图中心点和缩放级别
         map.setCenter([-42.6043, 90]);
-        map.setZoom(2.2);
+        map.setZoom(2);
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'visible');
@@ -629,7 +737,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = 'http://localhost:7070/#/ERate';
+        window.location.href = url + '/#/ERate';
 
       });
 
@@ -651,7 +759,7 @@ export default {
         map.doubleClickZoom.disable();
         // 设置地图中心点和缩放级别
         map.setCenter([-42.6043, 90]);
-        map.setZoom(2.2);
+        map.setZoom(2);
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'none');
@@ -659,7 +767,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = 'http://localhost:7070/#/RRate';
+        window.location.href = url + '/#/RRate';
       });
 
       // 创建一个按钮元素
@@ -681,7 +789,7 @@ export default {
         map.doubleClickZoom.disable();
         // 设置地图中心点和缩放级别
         map.setCenter([-42.6043, 90]);
-        map.setZoom(2.2);
+        map.setZoom(2);
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'none');
@@ -689,7 +797,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'visible');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = 'http://localhost:7070/#/SMBRate';
+        window.location.href = url + '/#/SMBRate';
       });
 
       // 创建一个按钮元素
@@ -710,7 +818,7 @@ export default {
         map.doubleClickZoom.disable();
         // 设置地图中心点和缩放级别
         map.setCenter([-42.6043, 90]);
-        map.setZoom(2.2);
+        map.setZoom(2);
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'none');
@@ -718,7 +826,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'visible');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = 'http://localhost:7070/#/PRate';
+        window.location.href = url + '/#/PRate';
       });
 
       // 创建一个按钮元素
@@ -739,7 +847,7 @@ export default {
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
         // 在单击时将用户重定向到新页面
-        window.location.href = 'http://localhost:7070/#/';
+        window.location.href = url + '/#/';
       });
 
       // 创建一个按钮元素
@@ -754,6 +862,14 @@ export default {
       // 为按钮添加 click 事件处理程序
       dischargeButton.addEventListener('click', function () {
 
+        // 禁用交互操作
+        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'none');
+
         map.boxZoom.enable();
         map.dragPan.enable();
         map.scrollZoom.enable();
@@ -765,16 +881,8 @@ export default {
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'visible');
 
-        // 禁用交互操作
-        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'none');
-
         // 在单击时将用户重定向到新页面
-        window.location.href = 'http://localhost:7070/#/';
+        window.location.href = url + '/#/';
       });
 
     });
@@ -830,7 +938,7 @@ export default {
 }
 
 #e-rate-button {
-  top: 90px;
+  top: 170px;
 }
 
 #r-rate-button {
@@ -838,7 +946,7 @@ export default {
 }
 
 #smb-rate-button {
-  top: 170px;
+  top: 90px;
 }
 
 #p-rate-button {
@@ -851,21 +959,5 @@ export default {
 
 #clear-button {
   top: 290px;
-}
-
-/* 设置垂直滚动条的样式 */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-/* 设置滚动条轨道的样式 */
-::-webkit-scrollbar-track {
-  background-color: rgba(0, 0, 0, 0);
-}
-
-/* 设置滚动条滑块的样式 */
-::-webkit-scrollbar-thumb {
-  background-color: gray;
 }
 </style>
