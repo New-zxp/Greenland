@@ -1,5 +1,5 @@
 <template>
-    <div style="position: relative; z-index: 999;" id="chartDiv" @mousedown="startDrag"
+    <div style="position: relative; z-index: 99;" id="chartDiv" @mousedown="startDrag"
         :style="{ left: chartLeft + 'px', top: chartTop + 'px' }">
         <div id="echarts" style="width: 500px; height: 380px; background-color: white;"></div>
         <button @click="downloadData" style="position: absolute; top: 5px; left: 320px;">下载数据</button>

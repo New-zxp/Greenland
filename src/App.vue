@@ -659,7 +659,7 @@ export default {
           glacierDischargeContainer.appendChild(closeButton);
           // 添加点击事件监听器
           closeButton.addEventListener('click', function () {
-            document.getElementById('glacierChart-container').style.display = 'none';
+            mapContainer.removeChild(document.getElementById('glacierChart-container'))
           });
 
           var downloadButton = document.createElement('button');
@@ -781,6 +781,11 @@ export default {
       var nwFlag = true;
       var seFlag = true;
       var swFlag = true;
+
+      var smb = false;
+      var ru = false;
+      var ev = false;
+      var pr = false;
 
       //点击各个区域时显示出Mass Change的图表
       map.on('click', 'greenlandCw-fill', function (e) {
@@ -1017,6 +1022,704 @@ export default {
           if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
             document.getElementById('chart-container').style.display = 'none';
           }
+        } else if (smb) {
+          var name = 'smb_cw';
+          var title = 'CW';
+          var yName = 'SMB';
+          Promise.all([
+            fetch('./src/data/smb/CW_smb.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (cm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'cw_smb.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
+        }
+        else if (ru) {
+          var name = 'ru_cw';
+          var title = 'CW';
+          var yName = 'Runoff';
+          Promise.all([
+            fetch('./src/data/ru/CW_ru.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'cw_ru.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
+        }
+        else if (ev) {
+          var name = 'ev_cw';
+          var title = 'CW';
+          var yName = 'EVAP + SUBL';
+          Promise.all([
+            fetch('./src/data/ev/CW_ev.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'cw_ev.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
+        }
+        else if (pr) {
+          var name = 'pr_cw';
+          var title = 'CW';
+          var yName = 'Precipitation';
+          Promise.all([
+            fetch('./src/data/pr/CW_pr.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'cw_pr.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
         }
       });
 
@@ -1068,96 +1771,280 @@ export default {
           map.setLayoutProperty('gate_meta', 'visibility', 'visible');
           isClickEventEnabled = false;
           window.location.href = url + '/#/ne'
-        } else {
-          if (isClickEventEnabled) {
-            // 移除之前创建的表格
-            var chartContainer = document.getElementById('chart-container');
-            if (chartContainer) {
-              chartContainer.parentNode.removeChild(chartContainer);
+        } else if (isClickEventEnabled) {
+          // 移除之前创建的表格
+          var chartContainer = document.getElementById('chart-container');
+          if (chartContainer) {
+            chartContainer.parentNode.removeChild(chartContainer);
+          }
+          var dischargeContainer = document.createElement('div');
+          dischargeContainer.id = 'chart-container';
+          dischargeContainer.style.position = 'relative';
+          dischargeContainer.style.left = '0px';
+          dischargeContainer.style.top = '0px';
+
+          mapContainer.appendChild(dischargeContainer);
+
+          // 获取边界线图层的边界经纬度坐标
+          var boundaryFeatures = map.querySourceFeatures('greenlandNe');
+
+          // 获取圆圈图层的所有圆圈要素
+          var circleFeatures = map.querySourceFeatures('gate_meta');
+
+          // 创建一个空数组用于存储合并后的结果
+          var mergedArray = [];
+
+          // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
+          circleFeatures.forEach(function (circle) {
+            var circleCenter = circle.geometry.coordinates;
+
+            // 检查中心点是否位于边界线图层的边界内
+            if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
+              var data = JSON.parse(circle.properties.speeds);
+              mergedArray.push(data);
             }
-            var dischargeContainer = document.createElement('div');
-            dischargeContainer.id = 'chart-container';
-            dischargeContainer.style.position = 'relative';
-            dischargeContainer.style.left = '0px';
-            dischargeContainer.style.top = '0px';
+          });
 
-            mapContainer.appendChild(dischargeContainer);
-
-            // 获取边界线图层的边界经纬度坐标
-            var boundaryFeatures = map.querySourceFeatures('greenlandNe');
-
-            // 获取圆圈图层的所有圆圈要素
-            var circleFeatures = map.querySourceFeatures('gate_meta');
-
-            // 创建一个空数组用于存储合并后的结果
-            var mergedArray = [];
-
-            // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
-            circleFeatures.forEach(function (circle) {
-              var circleCenter = circle.geometry.coordinates;
-
-              // 检查中心点是否位于边界线图层的边界内
-              if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
-                var data = JSON.parse(circle.properties.speeds);
-                mergedArray.push(data);
+          const mergedResult = mergedArray.reduce((result, array) => {
+            array.forEach((item) => {
+              const existingItem = result.find((r) => r.time === item.time);
+              if (existingItem) {
+                existingItem.discharge += item.discharge;
+              } else {
+                result.push({ time: item.time, discharge: item.discharge });
               }
             });
+            return result;
+          }, []);
 
-            const mergedResult = mergedArray.reduce((result, array) => {
-              array.forEach((item) => {
-                const existingItem = result.find((r) => r.time === item.time);
-                if (existingItem) {
-                  existingItem.discharge += item.discharge;
-                } else {
-                  result.push({ time: item.time, discharge: item.discharge });
+          // 判断一个点是否位于边界线图层的边界内
+          function isPointWithinBoundary(point, boundaryFeatures) {
+            var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
+              return feature.geometry.coordinates;
+            }));
+            var pointOnLine = turf.point(point);
+            return turf.booleanPointInPolygon(pointOnLine, polygon);
+          }
+
+          var data = mergedResult;
+          var chartContainer = document.createElement('div');
+          chartContainer.setAttribute('id', 'totalChart');
+          chartContainer.style.width = '628px';
+          chartContainer.style.height = '400px';
+          chartContainer.style.left = '0px';
+          chartContainer.style.position = 'absolute';
+          chartContainer.style.backgroundColor = 'white';
+          chartContainer.style.zIndex = 999;
+          dischargeContainer.appendChild(chartContainer);
+          var myChart = echarts.init(chartContainer);
+
+          myChart.setOption({
+            title: {
+              text: 'NE',   // 设置标题文本
+              textStyle: {              // 标题文字样式配置
+                color: 'black',
+                fontSize: 15,
+              },
+              left: 'center',   // 设置标题水平居中
+              top: '10px',
+            },
+            tooltip: {
+              trigger: "item",
+            },
+            xAxis: {
+              type: 'time',
+              data: data.map(item => item.time),
+              min: '1986', // 设置 X 轴的最小值
+              max: '2023', // 设置 X 轴的最大值
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            yAxis: {
+              type: 'value',
+              name: 'Discharge (Gt/yr)',
+              nameLocation: "middle",
+              nameTextStyle: {
+                fontSize: 15,
+              },
+              nameGap: 40,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            grid: {
+              width: '80%',  // 设置宽度为80%
+              height: '70%',  // 设置高度为80%
+              left: '10%',
+              top: '15%',
+            },
+            series: [
+              {
+                type: 'scatter',
+                name: 'discharge',
+                data: data.map(item => [item.time, item.discharge]),
+                color: 'red',
+                tooltip: {
+                  trigger: 'item',
+                  formatter: function (params) {
+                    const year = params.value[0];
+                    const discharge = params.value[1].toFixed(3);
+                    return "time:" + year + "<br />" + "discharge: " + discharge;
+                  }
                 }
-              });
-              return result;
-            }, []);
+              }
+            ],
+            toolbox: {
+              feature: {
+                saveAsImage: {},
+              },
+              itemSize: 18,
+              itemGap: 20,
+              right: 70,
+            },
+          });
 
-            // 判断一个点是否位于边界线图层的边界内
-            function isPointWithinBoundary(point, boundaryFeatures) {
-              var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
-                return feature.geometry.coordinates;
-              }));
-              var pointOnLine = turf.point(point);
-              return turf.booleanPointInPolygon(pointOnLine, polygon);
+          // 创建一个按钮元素
+          var closeButton = document.createElement('button');
+          closeButton.innerHTML = '关闭';
+          closeButton.id = 'close-button';
+          closeButton.style.position = 'absolute';
+          closeButton.style.left = '580px';
+          closeButton.style.top = '5px';
+          closeButton.style.zIndex = 999;
+          // 将按钮添加到地图容器中
+          dischargeContainer.appendChild(closeButton);
+          // 添加点击事件监听器
+          closeButton.addEventListener('click', function () {
+            mapContainer.removeChild(document.getElementById(name + 'container'));
+          });
+
+          var downloadButton = document.createElement('button');
+          downloadButton.innerHTML = '下载数据';
+          downloadButton.id = 'download-button';
+          downloadButton.style.position = 'absolute';
+          downloadButton.style.left = '440px';
+          downloadButton.style.top = '5px';
+          downloadButton.style.zIndex = 999;
+
+          // 将按钮添加到地图容器中
+          dischargeContainer.appendChild(downloadButton);
+          // 添加点击事件监听器
+          downloadButton.addEventListener('click', function () {
+            // 将数据转换为 CSV 格式
+            var csvContent = 'data:text/csv;charset=utf-8,';
+
+            // 添加 CSV 标题行
+            csvContent += 'Time,Discharge (Gt/yr)\n';
+
+            // 添加数据行
+            data.forEach(function (item) {
+              csvContent += item.time + ',' + item.discharge + '\n';
+            });
+
+            // 创建下载链接并设置文件名
+            var dataLink = document.createElement('a');
+            dataLink.href = encodeURI(csvContent);
+            dataLink.download = 'NE_Discharge.csv';
+            dataLink.click();
+          });
+          dischargeContainer.addEventListener('mousedown', startDrag);
+          function startDrag(e) {
+            e.preventDefault();
+
+            var initialX = e.clientX;
+            var initialY = e.clientY;
+            var startX = parseInt(dischargeContainer.style.left) || 0;
+            var startY = parseInt(dischargeContainer.style.top) || 0;
+
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleUp);
+
+            function handleMove(e) {
+              var offsetX = e.clientX - initialX;
+              var offsetY = e.clientY - initialY;
+
+              dischargeContainer.style.left = startX + offsetX + 'px';
+              dischargeContainer.style.top = startY + offsetY + 'px';
             }
 
-            var data = mergedResult;
-            var chartContainer = document.createElement('div');
-            chartContainer.setAttribute('id', 'totalChart');
-            chartContainer.style.width = '628px';
-            chartContainer.style.height = '400px';
-            chartContainer.style.left = '0px';
-            chartContainer.style.position = 'absolute';
-            chartContainer.style.backgroundColor = 'white';
-            chartContainer.style.zIndex = 999;
-            dischargeContainer.appendChild(chartContainer);
-            var myChart = echarts.init(chartContainer);
+            function handleUp() {
+              document.removeEventListener('mousemove', handleMove);
+              document.removeEventListener('mouseup', handleUp);
+            }
+          }
+          if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
+            document.getElementById('chart-container').style.display = 'none';
+          }
+        }
+        else if (smb) {
+          var name = 'smb_ne';
+          var title = 'NE';
+          var yName = 'SMB';
+          Promise.all([
+            fetch('./src/data/smb/NE_smb.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
 
             myChart.setOption({
               title: {
-                text: 'NE',   // 设置标题文本
+                text: title,   // 设置标题文本
                 textStyle: {              // 标题文字样式配置
                   color: 'black',
                   fontSize: 15,
                 },
                 left: 'center',   // 设置标题水平居中
-                top: '10px',
-              },
-              tooltip: {
-                trigger: "item",
+                top: '10px'
               },
               xAxis: {
-                type: 'time',
-                data: data.map(item => item.time),
-                min: '1986', // 设置 X 轴的最小值
-                max: '2023', // 设置 X 轴的最大值
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
                 axisLabel: {
                   fontFamily: 'Arial', // 设置字体
                   fontSize: 15,        // 设置字号
-                  color: '#333'        // 设置颜色
+                  color: '#333',        // 设置颜色
                 },
                 axisLine: {
                   show: false,
@@ -1168,7 +2055,7 @@ export default {
               },
               yAxis: {
                 type: 'value',
-                name: 'Discharge (Gt/yr)',
+                name: yName + ' (cm/yr)',
                 nameLocation: "middle",
                 nameTextStyle: {
                   fontSize: 15,
@@ -1194,19 +2081,13 @@ export default {
               },
               series: [
                 {
-                  type: 'scatter',
-                  name: 'discharge',
-                  data: data.map(item => [item.time, item.discharge]),
-                  color: 'red',
-                  tooltip: {
-                    trigger: 'item',
-                    formatter: function (params) {
-                      const year = params.value[0];
-                      const discharge = params.value[1].toFixed(3);
-                      return "time:" + year + "<br />" + "discharge: " + discharge;
-                    }
-                  }
-                }
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
               ],
               toolbox: {
                 feature: {
@@ -1221,55 +2102,52 @@ export default {
             // 创建一个按钮元素
             var closeButton = document.createElement('button');
             closeButton.innerHTML = '关闭';
-            closeButton.id = 'close-button';
+            closeButton.id = name + 'button';
             closeButton.style.position = 'absolute';
             closeButton.style.left = '580px';
             closeButton.style.top = '5px';
             closeButton.style.zIndex = 999;
             // 将按钮添加到地图容器中
-            dischargeContainer.appendChild(closeButton);
+            container.appendChild(closeButton);
             // 添加点击事件监听器
             closeButton.addEventListener('click', function () {
-              document.getElementById('chart-container').style.display = 'none';
+              mapContainer.removeChild(document.getElementById(name + 'container'));
             });
 
             var downloadButton = document.createElement('button');
             downloadButton.innerHTML = '下载数据';
-            downloadButton.id = 'download-button';
+            downloadButton.id = name + 'download-button';
             downloadButton.style.position = 'absolute';
             downloadButton.style.left = '440px';
             downloadButton.style.top = '5px';
             downloadButton.style.zIndex = 999;
 
             // 将按钮添加到地图容器中
-            dischargeContainer.appendChild(downloadButton);
-            // 添加点击事件监听器
+            container.appendChild(downloadButton);
+
             downloadButton.addEventListener('click', function () {
-              // 将数据转换为 CSV 格式
-              var csvContent = 'data:text/csv;charset=utf-8,';
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'ne_smb.csv';
+              link.target = '_blank';
 
-              // 添加 CSV 标题行
-              csvContent += 'Time,Discharge (Gt/yr)\n';
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
 
-              // 添加数据行
-              data.forEach(function (item) {
-                csvContent += item.time + ',' + item.discharge + '\n';
-              });
-
-              // 创建下载链接并设置文件名
-              var dataLink = document.createElement('a');
-              dataLink.href = encodeURI(csvContent);
-              dataLink.download = 'NE_Discharge.csv';
-              dataLink.click();
+              // 清理临时链接
+              document.body.removeChild(link);
             });
-            dischargeContainer.addEventListener('mousedown', startDrag);
+
+            container.addEventListener('mousedown', startDrag);
             function startDrag(e) {
               e.preventDefault();
 
               var initialX = e.clientX;
               var initialY = e.clientY;
-              var startX = parseInt(dischargeContainer.style.left) || 0;
-              var startY = parseInt(dischargeContainer.style.top) || 0;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
 
               document.addEventListener('mousemove', handleMove);
               document.addEventListener('mouseup', handleUp);
@@ -1278,8 +2156,8 @@ export default {
                 var offsetX = e.clientX - initialX;
                 var offsetY = e.clientY - initialY;
 
-                dischargeContainer.style.left = startX + offsetX + 'px';
-                dischargeContainer.style.top = startY + offsetY + 'px';
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
               }
 
               function handleUp() {
@@ -1287,10 +2165,529 @@ export default {
                 document.removeEventListener('mouseup', handleUp);
               }
             }
-            if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
-              document.getElementById('chart-container').style.display = 'none';
+          });
+        }
+        else if (ru) {
+          var name = 'ru_ne';
+          var title = 'NE';
+          var yName = 'Runoff';
+          Promise.all([
+            fetch('./src/data/ru/NE_ru.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
             }
-          }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'ne_ru.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
+        }
+        else if (ev) {
+          var name = 'ev_ne';
+          var title = 'NE';
+          var yName = 'EVAP + SUBL';
+          Promise.all([
+            fetch('./src/data/ev/NE_ev.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'ne_ev.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
+        }
+        else if (pr) {
+          var name = 'pr_ne';
+          var title = 'NE';
+          var yName = 'Precipitation';
+          Promise.all([
+            fetch('./src/data/pr/NE_pr.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'ne_pr.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
         }
       });
 
@@ -1345,96 +2742,279 @@ export default {
           map.setLayoutProperty('gate_meta', 'visibility', 'visible');
           isClickEventEnabled = false;
           window.location.href = url + '/#/no'
-        } else {
-          if (isClickEventEnabled) {
-            // 移除之前创建的表格
-            var chartContainer = document.getElementById('chart-container');
-            if (chartContainer) {
-              chartContainer.parentNode.removeChild(chartContainer);
+        } else if (isClickEventEnabled) {
+          // 移除之前创建的表格
+          var chartContainer = document.getElementById('chart-container');
+          if (chartContainer) {
+            chartContainer.parentNode.removeChild(chartContainer);
+          }
+          var dischargeContainer = document.createElement('div');
+          dischargeContainer.id = 'chart-container';
+          dischargeContainer.style.position = 'relative';
+          dischargeContainer.style.left = '0px';
+          dischargeContainer.style.top = '0px';
+
+          mapContainer.appendChild(dischargeContainer);
+
+          // 获取边界线图层的边界经纬度坐标
+          var boundaryFeatures = map.querySourceFeatures('greenlandNo');
+
+          // 获取圆圈图层的所有圆圈要素
+          var circleFeatures = map.querySourceFeatures('gate_meta');
+
+          // 创建一个空数组用于存储合并后的结果
+          var mergedArray = [];
+
+          // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
+          circleFeatures.forEach(function (circle) {
+            var circleCenter = circle.geometry.coordinates;
+
+            // 检查中心点是否位于边界线图层的边界内
+            if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
+              var data = JSON.parse(circle.properties.speeds);
+              mergedArray.push(data);
             }
-            var dischargeContainer = document.createElement('div');
-            dischargeContainer.id = 'chart-container';
-            dischargeContainer.style.position = 'relative';
-            dischargeContainer.style.left = '0px';
-            dischargeContainer.style.top = '0px';
+          });
 
-            mapContainer.appendChild(dischargeContainer);
-
-            // 获取边界线图层的边界经纬度坐标
-            var boundaryFeatures = map.querySourceFeatures('greenlandNo');
-
-            // 获取圆圈图层的所有圆圈要素
-            var circleFeatures = map.querySourceFeatures('gate_meta');
-
-            // 创建一个空数组用于存储合并后的结果
-            var mergedArray = [];
-
-            // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
-            circleFeatures.forEach(function (circle) {
-              var circleCenter = circle.geometry.coordinates;
-
-              // 检查中心点是否位于边界线图层的边界内
-              if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
-                var data = JSON.parse(circle.properties.speeds);
-                mergedArray.push(data);
+          const mergedResult = mergedArray.reduce((result, array) => {
+            array.forEach((item) => {
+              const existingItem = result.find((r) => r.time === item.time);
+              if (existingItem) {
+                existingItem.discharge += item.discharge;
+              } else {
+                result.push({ time: item.time, discharge: item.discharge });
               }
             });
+            return result;
+          }, []);
 
-            const mergedResult = mergedArray.reduce((result, array) => {
-              array.forEach((item) => {
-                const existingItem = result.find((r) => r.time === item.time);
-                if (existingItem) {
-                  existingItem.discharge += item.discharge;
-                } else {
-                  result.push({ time: item.time, discharge: item.discharge });
+          // 判断一个点是否位于边界线图层的边界内
+          function isPointWithinBoundary(point, boundaryFeatures) {
+            var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
+              return feature.geometry.coordinates;
+            }));
+            var pointOnLine = turf.point(point);
+            return turf.booleanPointInPolygon(pointOnLine, polygon);
+          }
+
+          var data = mergedResult;
+          var chartContainer = document.createElement('div');
+          chartContainer.setAttribute('id', 'totalChart');
+          chartContainer.style.width = '628px';
+          chartContainer.style.height = '400px';
+          chartContainer.style.left = '0px';
+          chartContainer.style.position = 'absolute';
+          chartContainer.style.backgroundColor = 'white';
+          chartContainer.style.zIndex = 999;
+          dischargeContainer.appendChild(chartContainer);
+          var myChart = echarts.init(chartContainer);
+
+          myChart.setOption({
+            title: {
+              text: 'NO',   // 设置标题文本
+              textStyle: {              // 标题文字样式配置
+                color: 'black',
+                fontSize: 15,
+              },
+              left: 'center',   // 设置标题水平居中
+              top: '10px',
+            },
+            tooltip: {
+              trigger: "item",
+            },
+            xAxis: {
+              type: 'time',
+              data: data.map(item => item.time),
+              min: '1986', // 设置 X 轴的最小值
+              max: '2023', // 设置 X 轴的最大值
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            yAxis: {
+              type: 'value',
+              name: 'Discharge (Gt/yr)',
+              nameLocation: "middle",
+              nameTextStyle: {
+                fontSize: 15,
+              },
+              nameGap: 40,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            grid: {
+              width: '80%',  // 设置宽度为80%
+              height: '70%',  // 设置高度为80%
+              left: '10%',
+              top: '15%',
+            },
+            series: [
+              {
+                type: 'scatter',
+                name: 'discharge',
+                data: data.map(item => [item.time, item.discharge]),
+                color: 'red',
+                tooltip: {
+                  trigger: 'item',
+                  formatter: function (params) {
+                    const year = params.value[0];
+                    const discharge = params.value[1].toFixed(3);
+                    return "time:" + year + "<br />" + "discharge: " + discharge;
+                  }
                 }
-              });
-              return result;
-            }, []);
+              }
+            ],
+            toolbox: {
+              feature: {
+                saveAsImage: {},
+              },
+              itemSize: 18,
+              itemGap: 20,
+              right: 70,
+            },
+          });
 
-            // 判断一个点是否位于边界线图层的边界内
-            function isPointWithinBoundary(point, boundaryFeatures) {
-              var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
-                return feature.geometry.coordinates;
-              }));
-              var pointOnLine = turf.point(point);
-              return turf.booleanPointInPolygon(pointOnLine, polygon);
+          // 创建一个按钮元素
+          var closeButton = document.createElement('button');
+          closeButton.innerHTML = '关闭';
+          closeButton.id = 'close-button';
+          closeButton.style.position = 'absolute';
+          closeButton.style.left = '580px';
+          closeButton.style.top = '5px';
+          closeButton.style.zIndex = 999;
+          // 将按钮添加到地图容器中
+          dischargeContainer.appendChild(closeButton);
+          // 添加点击事件监听器
+          closeButton.addEventListener('click', function () {
+            document.getElementById('chart-container').style.display = 'none';
+          });
+
+          var downloadButton = document.createElement('button');
+          downloadButton.innerHTML = '下载数据';
+          downloadButton.id = 'download-button';
+          downloadButton.style.position = 'absolute';
+          downloadButton.style.left = '440px';
+          downloadButton.style.top = '5px';
+          downloadButton.style.zIndex = 999;
+
+          // 将按钮添加到地图容器中
+          dischargeContainer.appendChild(downloadButton);
+          // 添加点击事件监听器
+          downloadButton.addEventListener('click', function () {
+            // 将数据转换为 CSV 格式
+            var csvContent = 'data:text/csv;charset=utf-8,';
+
+            // 添加 CSV 标题行
+            csvContent += 'Time,Discharge (Gt/yr)\n';
+
+            // 添加数据行
+            data.forEach(function (item) {
+              csvContent += item.time + ',' + item.discharge + '\n';
+            });
+
+            // 创建下载链接并设置文件名
+            var dataLink = document.createElement('a');
+            dataLink.href = encodeURI(csvContent);
+            dataLink.download = 'NO_Discharge.csv';
+            dataLink.click();
+          });
+          dischargeContainer.addEventListener('mousedown', startDrag);
+          function startDrag(e) {
+            e.preventDefault();
+
+            var initialX = e.clientX;
+            var initialY = e.clientY;
+            var startX = parseInt(dischargeContainer.style.left) || 0;
+            var startY = parseInt(dischargeContainer.style.top) || 0;
+
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleUp);
+
+            function handleMove(e) {
+              var offsetX = e.clientX - initialX;
+              var offsetY = e.clientY - initialY;
+
+              dischargeContainer.style.left = startX + offsetX + 'px';
+              dischargeContainer.style.top = startY + offsetY + 'px';
             }
 
-            var data = mergedResult;
-            var chartContainer = document.createElement('div');
-            chartContainer.setAttribute('id', 'totalChart');
-            chartContainer.style.width = '628px';
-            chartContainer.style.height = '400px';
-            chartContainer.style.left = '0px';
-            chartContainer.style.position = 'absolute';
-            chartContainer.style.backgroundColor = 'white';
-            chartContainer.style.zIndex = 999;
-            dischargeContainer.appendChild(chartContainer);
-            var myChart = echarts.init(chartContainer);
+            function handleUp() {
+              document.removeEventListener('mousemove', handleMove);
+              document.removeEventListener('mouseup', handleUp);
+            }
+          }
+          if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
+            document.getElementById('chart-container').style.display = 'none';
+          }
+        } else if (smb) {
+          var name = 'smb_no';
+          var title = 'NO';
+          var yName = 'SMB';
+          Promise.all([
+            fetch('./src/data/smb/NO_smb.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
 
             myChart.setOption({
               title: {
-                text: 'NO',   // 设置标题文本
+                text: title,   // 设置标题文本
                 textStyle: {              // 标题文字样式配置
                   color: 'black',
                   fontSize: 15,
                 },
                 left: 'center',   // 设置标题水平居中
-                top: '10px',
-              },
-              tooltip: {
-                trigger: "item",
+                top: '10px'
               },
               xAxis: {
-                type: 'time',
-                data: data.map(item => item.time),
-                min: '1986', // 设置 X 轴的最小值
-                max: '2023', // 设置 X 轴的最大值
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
                 axisLabel: {
                   fontFamily: 'Arial', // 设置字体
                   fontSize: 15,        // 设置字号
-                  color: '#333'        // 设置颜色
+                  color: '#333',        // 设置颜色
                 },
                 axisLine: {
                   show: false,
@@ -1445,7 +3025,7 @@ export default {
               },
               yAxis: {
                 type: 'value',
-                name: 'Discharge (Gt/yr)',
+                name: yName + ' (cm/yr)',
                 nameLocation: "middle",
                 nameTextStyle: {
                   fontSize: 15,
@@ -1471,19 +3051,13 @@ export default {
               },
               series: [
                 {
-                  type: 'scatter',
-                  name: 'discharge',
-                  data: data.map(item => [item.time, item.discharge]),
-                  color: 'red',
-                  tooltip: {
-                    trigger: 'item',
-                    formatter: function (params) {
-                      const year = params.value[0];
-                      const discharge = params.value[1].toFixed(3);
-                      return "time:" + year + "<br />" + "discharge: " + discharge;
-                    }
-                  }
-                }
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
               ],
               toolbox: {
                 feature: {
@@ -1498,55 +3072,52 @@ export default {
             // 创建一个按钮元素
             var closeButton = document.createElement('button');
             closeButton.innerHTML = '关闭';
-            closeButton.id = 'close-button';
+            closeButton.id = name + 'button';
             closeButton.style.position = 'absolute';
             closeButton.style.left = '580px';
             closeButton.style.top = '5px';
             closeButton.style.zIndex = 999;
             // 将按钮添加到地图容器中
-            dischargeContainer.appendChild(closeButton);
+            container.appendChild(closeButton);
             // 添加点击事件监听器
             closeButton.addEventListener('click', function () {
-              document.getElementById('chart-container').style.display = 'none';
+              mapContainer.removeChild(document.getElementById(name + 'container'));
             });
 
             var downloadButton = document.createElement('button');
             downloadButton.innerHTML = '下载数据';
-            downloadButton.id = 'download-button';
+            downloadButton.id = name + 'download-button';
             downloadButton.style.position = 'absolute';
             downloadButton.style.left = '440px';
             downloadButton.style.top = '5px';
             downloadButton.style.zIndex = 999;
 
             // 将按钮添加到地图容器中
-            dischargeContainer.appendChild(downloadButton);
-            // 添加点击事件监听器
+            container.appendChild(downloadButton);
+
             downloadButton.addEventListener('click', function () {
-              // 将数据转换为 CSV 格式
-              var csvContent = 'data:text/csv;charset=utf-8,';
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'no_smb.csv';
+              link.target = '_blank';
 
-              // 添加 CSV 标题行
-              csvContent += 'Time,Discharge (Gt/yr)\n';
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
 
-              // 添加数据行
-              data.forEach(function (item) {
-                csvContent += item.time + ',' + item.discharge + '\n';
-              });
-
-              // 创建下载链接并设置文件名
-              var dataLink = document.createElement('a');
-              dataLink.href = encodeURI(csvContent);
-              dataLink.download = 'NO_Discharge.csv';
-              dataLink.click();
+              // 清理临时链接
+              document.body.removeChild(link);
             });
-            dischargeContainer.addEventListener('mousedown', startDrag);
+
+            container.addEventListener('mousedown', startDrag);
             function startDrag(e) {
               e.preventDefault();
 
               var initialX = e.clientX;
               var initialY = e.clientY;
-              var startX = parseInt(dischargeContainer.style.left) || 0;
-              var startY = parseInt(dischargeContainer.style.top) || 0;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
 
               document.addEventListener('mousemove', handleMove);
               document.addEventListener('mouseup', handleUp);
@@ -1555,8 +3126,8 @@ export default {
                 var offsetX = e.clientX - initialX;
                 var offsetY = e.clientY - initialY;
 
-                dischargeContainer.style.left = startX + offsetX + 'px';
-                dischargeContainer.style.top = startY + offsetY + 'px';
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
               }
 
               function handleUp() {
@@ -1564,10 +3135,529 @@ export default {
                 document.removeEventListener('mouseup', handleUp);
               }
             }
-            if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
-              document.getElementById('chart-container').style.display = 'none';
+          });
+        }
+        else if (ru) {
+          var name = 'ru_no';
+          var title = 'No';
+          var yName = 'Runoff';
+          Promise.all([
+            fetch('./src/data/ru/NO_ru.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
             }
-          }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'no_ru.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
+        }
+        else if (ev) {
+          var name = 'ev_no';
+          var title = 'NO';
+          var yName = 'EVAP + SUBL';
+          Promise.all([
+            fetch('./src/data/ev/NO_ev.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'no_ev.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
+        }
+        else if (pr) {
+          var name = 'pr_no';
+          var title = 'NO';
+          var yName = 'Precipitation';
+          Promise.all([
+            fetch('./src/data/pr/NO_pr.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'no_pr.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
         }
       });
 
@@ -1619,97 +3709,280 @@ export default {
           map.setLayoutProperty('gate_meta', 'visibility', 'visible');
           isClickEventEnabled = false;
           window.location.href = url + '/#/nw'
-        } else {
-          if (isClickEventEnabled) {
-            // 移除之前创建的表格
-            var chartContainer = document.getElementById('chart-container');
-            if (chartContainer) {
-              chartContainer.parentNode.removeChild(chartContainer);
+        } else if (isClickEventEnabled) {
+          // 移除之前创建的表格
+          var chartContainer = document.getElementById('chart-container');
+          if (chartContainer) {
+            chartContainer.parentNode.removeChild(chartContainer);
+          }
+
+          var dischargeContainer = document.createElement('div');
+          dischargeContainer.id = 'chart-container';
+          dischargeContainer.style.position = 'relative';
+          dischargeContainer.style.left = '0px';
+          dischargeContainer.style.top = '0px';
+
+          mapContainer.appendChild(dischargeContainer);
+
+          // 获取边界线图层的边界经纬度坐标
+          var boundaryFeatures = map.querySourceFeatures('greenlandNw');
+
+          // 获取圆圈图层的所有圆圈要素
+          var circleFeatures = map.querySourceFeatures('gate_meta');
+
+          // 创建一个空数组用于存储合并后的结果
+          var mergedArray = [];
+
+          // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
+          circleFeatures.forEach(function (circle) {
+            var circleCenter = circle.geometry.coordinates;
+
+            // 检查中心点是否位于边界线图层的边界内
+            if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
+              var data = JSON.parse(circle.properties.speeds);
+              mergedArray.push(data);
             }
+          });
 
-            var dischargeContainer = document.createElement('div');
-            dischargeContainer.id = 'chart-container';
-            dischargeContainer.style.position = 'relative';
-            dischargeContainer.style.left = '0px';
-            dischargeContainer.style.top = '0px';
-
-            mapContainer.appendChild(dischargeContainer);
-
-            // 获取边界线图层的边界经纬度坐标
-            var boundaryFeatures = map.querySourceFeatures('greenlandNw');
-
-            // 获取圆圈图层的所有圆圈要素
-            var circleFeatures = map.querySourceFeatures('gate_meta');
-
-            // 创建一个空数组用于存储合并后的结果
-            var mergedArray = [];
-
-            // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
-            circleFeatures.forEach(function (circle) {
-              var circleCenter = circle.geometry.coordinates;
-
-              // 检查中心点是否位于边界线图层的边界内
-              if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
-                var data = JSON.parse(circle.properties.speeds);
-                mergedArray.push(data);
+          const mergedResult = mergedArray.reduce((result, array) => {
+            array.forEach((item) => {
+              const existingItem = result.find((r) => r.time === item.time);
+              if (existingItem) {
+                existingItem.discharge += item.discharge;
+              } else {
+                result.push({ time: item.time, discharge: item.discharge });
               }
             });
+            return result;
+          }, []);
 
-            const mergedResult = mergedArray.reduce((result, array) => {
-              array.forEach((item) => {
-                const existingItem = result.find((r) => r.time === item.time);
-                if (existingItem) {
-                  existingItem.discharge += item.discharge;
-                } else {
-                  result.push({ time: item.time, discharge: item.discharge });
+          // 判断一个点是否位于边界线图层的边界内
+          function isPointWithinBoundary(point, boundaryFeatures) {
+            var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
+              return feature.geometry.coordinates;
+            }));
+            var pointOnLine = turf.point(point);
+            return turf.booleanPointInPolygon(pointOnLine, polygon);
+          }
+
+          var data = mergedResult;
+          var chartContainer = document.createElement('div');
+          chartContainer.setAttribute('id', 'totalChart');
+          chartContainer.style.width = '628px';
+          chartContainer.style.height = '400px';
+          chartContainer.style.left = '0px';
+          chartContainer.style.position = 'absolute';
+          chartContainer.style.backgroundColor = 'white';
+          chartContainer.style.zIndex = 999;
+          dischargeContainer.appendChild(chartContainer);
+          var myChart = echarts.init(chartContainer);
+
+          myChart.setOption({
+            title: {
+              text: 'NW',   // 设置标题文本
+              textStyle: {              // 标题文字样式配置
+                color: 'black',
+                fontSize: 15,
+              },
+              left: 'center',   // 设置标题水平居中
+              top: '10px',
+            },
+            tooltip: {
+              trigger: "item",
+            },
+            xAxis: {
+              type: 'time',
+              data: data.map(item => item.time),
+              min: '1986', // 设置 X 轴的最小值
+              max: '2023', // 设置 X 轴的最大值
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            yAxis: {
+              type: 'value',
+              name: 'Discharge (Gt/yr)',
+              nameLocation: "middle",
+              nameTextStyle: {
+                fontSize: 15,
+              },
+              nameGap: 40,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            grid: {
+              width: '80%',  // 设置宽度为80%
+              height: '70%',  // 设置高度为80%
+              left: '10%',
+              top: '15%',
+            },
+            series: [
+              {
+                type: 'scatter',
+                name: 'discharge',
+                data: data.map(item => [item.time, item.discharge]),
+                color: 'red',
+                tooltip: {
+                  trigger: 'item',
+                  formatter: function (params) {
+                    const year = params.value[0];
+                    const discharge = params.value[1].toFixed(3);
+                    return "time:" + year + "<br />" + "discharge: " + discharge;
+                  }
                 }
-              });
-              return result;
-            }, []);
+              }
+            ],
+            toolbox: {
+              feature: {
+                saveAsImage: {},
+              },
+              itemSize: 18,
+              itemGap: 20,
+              right: 70,
+            },
+          });
 
-            // 判断一个点是否位于边界线图层的边界内
-            function isPointWithinBoundary(point, boundaryFeatures) {
-              var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
-                return feature.geometry.coordinates;
-              }));
-              var pointOnLine = turf.point(point);
-              return turf.booleanPointInPolygon(pointOnLine, polygon);
+          // 创建一个按钮元素
+          var closeButton = document.createElement('button');
+          closeButton.innerHTML = '关闭';
+          closeButton.id = 'close-button';
+          closeButton.style.position = 'absolute';
+          closeButton.style.left = '580px';
+          closeButton.style.top = '5px';
+          closeButton.style.zIndex = 999;
+          // 将按钮添加到地图容器中
+          dischargeContainer.appendChild(closeButton);
+          // 添加点击事件监听器
+          closeButton.addEventListener('click', function () {
+            document.getElementById('chart-container').style.display = 'none';
+          });
+
+          var downloadButton = document.createElement('button');
+          downloadButton.innerHTML = '下载数据';
+          downloadButton.id = 'download-button';
+          downloadButton.style.position = 'absolute';
+          downloadButton.style.left = '440px';
+          downloadButton.style.top = '5px';
+          downloadButton.style.zIndex = 999;
+
+          // 将按钮添加到地图容器中
+          dischargeContainer.appendChild(downloadButton);
+          // 添加点击事件监听器
+          downloadButton.addEventListener('click', function () {
+            // 将数据转换为 CSV 格式
+            var csvContent = 'data:text/csv;charset=utf-8,';
+
+            // 添加 CSV 标题行
+            csvContent += 'Time,Discharge (Gt/yr)\n';
+
+            // 添加数据行
+            data.forEach(function (item) {
+              csvContent += item.time + ',' + item.discharge + '\n';
+            });
+
+            // 创建下载链接并设置文件名
+            var dataLink = document.createElement('a');
+            dataLink.href = encodeURI(csvContent);
+            dataLink.download = 'NW_Discharge.csv';
+            dataLink.click();
+          });
+          dischargeContainer.addEventListener('mousedown', startDrag);
+          function startDrag(e) {
+            e.preventDefault();
+
+            var initialX = e.clientX;
+            var initialY = e.clientY;
+            var startX = parseInt(dischargeContainer.style.left) || 0;
+            var startY = parseInt(dischargeContainer.style.top) || 0;
+
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleUp);
+
+            function handleMove(e) {
+              var offsetX = e.clientX - initialX;
+              var offsetY = e.clientY - initialY;
+
+              dischargeContainer.style.left = startX + offsetX + 'px';
+              dischargeContainer.style.top = startY + offsetY + 'px';
             }
 
-            var data = mergedResult;
-            var chartContainer = document.createElement('div');
-            chartContainer.setAttribute('id', 'totalChart');
-            chartContainer.style.width = '628px';
-            chartContainer.style.height = '400px';
-            chartContainer.style.left = '0px';
-            chartContainer.style.position = 'absolute';
-            chartContainer.style.backgroundColor = 'white';
-            chartContainer.style.zIndex = 999;
-            dischargeContainer.appendChild(chartContainer);
-            var myChart = echarts.init(chartContainer);
+            function handleUp() {
+              document.removeEventListener('mousemove', handleMove);
+              document.removeEventListener('mouseup', handleUp);
+            }
+          }
+          if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
+            document.getElementById('chart-container').style.display = 'none';
+          }
+        } else if (smb) {
+          var name = 'smb_nw';
+          var title = 'NW';
+          var yName = 'SMB';
+          Promise.all([
+            fetch('./src/data/smb/NW_smb.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
 
             myChart.setOption({
               title: {
-                text: 'NW',   // 设置标题文本
+                text: title,   // 设置标题文本
                 textStyle: {              // 标题文字样式配置
                   color: 'black',
                   fontSize: 15,
                 },
                 left: 'center',   // 设置标题水平居中
-                top: '10px',
-              },
-              tooltip: {
-                trigger: "item",
+                top: '10px'
               },
               xAxis: {
-                type: 'time',
-                data: data.map(item => item.time),
-                min: '1986', // 设置 X 轴的最小值
-                max: '2023', // 设置 X 轴的最大值
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
                 axisLabel: {
                   fontFamily: 'Arial', // 设置字体
                   fontSize: 15,        // 设置字号
-                  color: '#333'        // 设置颜色
+                  color: '#333',        // 设置颜色
                 },
                 axisLine: {
                   show: false,
@@ -1720,7 +3993,7 @@ export default {
               },
               yAxis: {
                 type: 'value',
-                name: 'Discharge (Gt/yr)',
+                name: yName + ' (cm/yr)',
                 nameLocation: "middle",
                 nameTextStyle: {
                   fontSize: 15,
@@ -1746,19 +4019,13 @@ export default {
               },
               series: [
                 {
-                  type: 'scatter',
-                  name: 'discharge',
-                  data: data.map(item => [item.time, item.discharge]),
-                  color: 'red',
-                  tooltip: {
-                    trigger: 'item',
-                    formatter: function (params) {
-                      const year = params.value[0];
-                      const discharge = params.value[1].toFixed(3);
-                      return "time:" + year + "<br />" + "discharge: " + discharge;
-                    }
-                  }
-                }
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
               ],
               toolbox: {
                 feature: {
@@ -1773,55 +4040,52 @@ export default {
             // 创建一个按钮元素
             var closeButton = document.createElement('button');
             closeButton.innerHTML = '关闭';
-            closeButton.id = 'close-button';
+            closeButton.id = name + 'button';
             closeButton.style.position = 'absolute';
             closeButton.style.left = '580px';
             closeButton.style.top = '5px';
             closeButton.style.zIndex = 999;
             // 将按钮添加到地图容器中
-            dischargeContainer.appendChild(closeButton);
+            container.appendChild(closeButton);
             // 添加点击事件监听器
             closeButton.addEventListener('click', function () {
-              document.getElementById('chart-container').style.display = 'none';
+              mapContainer.removeChild(document.getElementById(name + 'container'));
             });
 
             var downloadButton = document.createElement('button');
             downloadButton.innerHTML = '下载数据';
-            downloadButton.id = 'download-button';
+            downloadButton.id = name + 'download-button';
             downloadButton.style.position = 'absolute';
             downloadButton.style.left = '440px';
             downloadButton.style.top = '5px';
             downloadButton.style.zIndex = 999;
 
             // 将按钮添加到地图容器中
-            dischargeContainer.appendChild(downloadButton);
-            // 添加点击事件监听器
+            container.appendChild(downloadButton);
+
             downloadButton.addEventListener('click', function () {
-              // 将数据转换为 CSV 格式
-              var csvContent = 'data:text/csv;charset=utf-8,';
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'nw_smb.csv';
+              link.target = '_blank';
 
-              // 添加 CSV 标题行
-              csvContent += 'Time,Discharge (Gt/yr)\n';
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
 
-              // 添加数据行
-              data.forEach(function (item) {
-                csvContent += item.time + ',' + item.discharge + '\n';
-              });
-
-              // 创建下载链接并设置文件名
-              var dataLink = document.createElement('a');
-              dataLink.href = encodeURI(csvContent);
-              dataLink.download = 'NW_Discharge.csv';
-              dataLink.click();
+              // 清理临时链接
+              document.body.removeChild(link);
             });
-            dischargeContainer.addEventListener('mousedown', startDrag);
+
+            container.addEventListener('mousedown', startDrag);
             function startDrag(e) {
               e.preventDefault();
 
               var initialX = e.clientX;
               var initialY = e.clientY;
-              var startX = parseInt(dischargeContainer.style.left) || 0;
-              var startY = parseInt(dischargeContainer.style.top) || 0;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
 
               document.addEventListener('mousemove', handleMove);
               document.addEventListener('mouseup', handleUp);
@@ -1830,8 +4094,8 @@ export default {
                 var offsetX = e.clientX - initialX;
                 var offsetY = e.clientY - initialY;
 
-                dischargeContainer.style.left = startX + offsetX + 'px';
-                dischargeContainer.style.top = startY + offsetY + 'px';
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
               }
 
               function handleUp() {
@@ -1839,10 +4103,529 @@ export default {
                 document.removeEventListener('mouseup', handleUp);
               }
             }
-            if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
-              document.getElementById('chart-container').style.display = 'none';
+          });
+        }
+        else if (ru) {
+          var name = 'ru_nw';
+          var title = 'NW';
+          var yName = 'Runoff';
+          Promise.all([
+            fetch('./src/data/ru/NW_ru.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
             }
-          }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'nw_ru.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
+        }
+        else if (ev) {
+          var name = 'ev_nw';
+          var title = 'NW';
+          var yName = 'EVAP + SUBL';
+          Promise.all([
+            fetch('./src/data/ev/NW_ev.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'nw_ev.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
+        }
+        else if (pr) {
+          var name = 'pr_nw';
+          var title = 'NW';
+          var yName = 'Precipitation';
+          Promise.all([
+            fetch('./src/data/pr/NW_pr.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'nw_pr.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
         }
       });
 
@@ -1896,96 +4679,280 @@ export default {
           map.setLayoutProperty('gate_meta', 'visibility', 'visible');
           isClickEventEnabled = false;
           window.location.href = url + '/#/se'
-        } else {
-          if (isClickEventEnabled) {
-            // 移除之前创建的表格
-            var chartContainer = document.getElementById('chart-container');
-            if (chartContainer) {
-              chartContainer.parentNode.removeChild(chartContainer);
+        } else if (isClickEventEnabled) {
+          // 移除之前创建的表格
+          var chartContainer = document.getElementById('chart-container');
+          if (chartContainer) {
+            chartContainer.parentNode.removeChild(chartContainer);
+          }
+          var dischargeContainer = document.createElement('div');
+          dischargeContainer.id = 'chart-container';
+          dischargeContainer.style.position = 'relative';
+          dischargeContainer.style.left = '0px';
+          dischargeContainer.style.top = '0px';
+
+          mapContainer.appendChild(dischargeContainer);
+
+          // 获取边界线图层的边界经纬度坐标
+          var boundaryFeatures = map.querySourceFeatures('greenlandSe');
+
+          // 获取圆圈图层的所有圆圈要素
+          var circleFeatures = map.querySourceFeatures('gate_meta');
+
+          // 创建一个空数组用于存储合并后的结果
+          var mergedArray = [];
+
+          // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
+          circleFeatures.forEach(function (circle) {
+            var circleCenter = circle.geometry.coordinates;
+
+            // 检查中心点是否位于边界线图层的边界内
+            if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
+              var data = JSON.parse(circle.properties.speeds);
+              mergedArray.push(data);
             }
-            var dischargeContainer = document.createElement('div');
-            dischargeContainer.id = 'chart-container';
-            dischargeContainer.style.position = 'relative';
-            dischargeContainer.style.left = '0px';
-            dischargeContainer.style.top = '0px';
+          });
 
-            mapContainer.appendChild(dischargeContainer);
-
-            // 获取边界线图层的边界经纬度坐标
-            var boundaryFeatures = map.querySourceFeatures('greenlandSe');
-
-            // 获取圆圈图层的所有圆圈要素
-            var circleFeatures = map.querySourceFeatures('gate_meta');
-
-            // 创建一个空数组用于存储合并后的结果
-            var mergedArray = [];
-
-            // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
-            circleFeatures.forEach(function (circle) {
-              var circleCenter = circle.geometry.coordinates;
-
-              // 检查中心点是否位于边界线图层的边界内
-              if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
-                var data = JSON.parse(circle.properties.speeds);
-                mergedArray.push(data);
+          const mergedResult = mergedArray.reduce((result, array) => {
+            array.forEach((item) => {
+              const existingItem = result.find((r) => r.time === item.time);
+              if (existingItem) {
+                existingItem.discharge += item.discharge;
+              } else {
+                result.push({ time: item.time, discharge: item.discharge });
               }
             });
+            return result;
+          }, []);
 
-            const mergedResult = mergedArray.reduce((result, array) => {
-              array.forEach((item) => {
-                const existingItem = result.find((r) => r.time === item.time);
-                if (existingItem) {
-                  existingItem.discharge += item.discharge;
-                } else {
-                  result.push({ time: item.time, discharge: item.discharge });
+          // 判断一个点是否位于边界线图层的边界内
+          function isPointWithinBoundary(point, boundaryFeatures) {
+            var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
+              return feature.geometry.coordinates;
+            }));
+            var pointOnLine = turf.point(point);
+            return turf.booleanPointInPolygon(pointOnLine, polygon);
+          }
+
+          var data = mergedResult;
+          var chartContainer = document.createElement('div');
+          chartContainer.setAttribute('id', 'totalChart');
+          chartContainer.style.width = '628px';
+          chartContainer.style.height = '400px';
+          chartContainer.style.left = '0px';
+          chartContainer.style.position = 'absolute';
+          chartContainer.style.backgroundColor = 'white';
+          chartContainer.style.zIndex = 999;
+          dischargeContainer.appendChild(chartContainer);
+          var myChart = echarts.init(chartContainer);
+
+          myChart.setOption({
+            title: {
+              text: 'SE',   // 设置标题文本
+              textStyle: {              // 标题文字样式配置
+                color: 'black',
+                fontSize: 15,
+              },
+              left: 'center',   // 设置标题水平居中
+              top: '10px',
+            },
+            tooltip: {
+              trigger: "item",
+            },
+            xAxis: {
+              type: 'time',
+              data: data.map(item => item.time),
+              min: '1986', // 设置 X 轴的最小值
+              max: '2023', // 设置 X 轴的最大值
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            yAxis: {
+              type: 'value',
+              name: 'Discharge (Gt/yr)',
+              nameLocation: "middle",
+              nameTextStyle: {
+                fontSize: 15,
+              },
+              nameGap: 40,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            grid: {
+              width: '80%',  // 设置宽度为80%
+              height: '70%',  // 设置高度为80%
+              left: '10%',
+              top: '15%',
+            },
+            series: [
+              {
+                type: 'scatter',
+                name: 'discharge',
+                data: data.map(item => [item.time, item.discharge]),
+                color: 'red',
+                tooltip: {
+                  trigger: 'item',
+                  formatter: function (params) {
+                    const year = params.value[0];
+                    const discharge = params.value[1].toFixed(3);
+                    return "time:" + year + "<br />" + "discharge: " + discharge;
+                  }
                 }
-              });
-              return result;
-            }, []);
+              }
+            ],
+            toolbox: {
+              feature: {
+                saveAsImage: {},
+              },
+              itemSize: 18,
+              itemGap: 20,
+              right: 70,
+            },
+          });
 
-            // 判断一个点是否位于边界线图层的边界内
-            function isPointWithinBoundary(point, boundaryFeatures) {
-              var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
-                return feature.geometry.coordinates;
-              }));
-              var pointOnLine = turf.point(point);
-              return turf.booleanPointInPolygon(pointOnLine, polygon);
+          // 创建一个按钮元素
+          var closeButton = document.createElement('button');
+          closeButton.innerHTML = '关闭';
+          closeButton.id = 'close-button';
+          closeButton.style.position = 'absolute';
+          closeButton.style.left = '580px';
+          closeButton.style.top = '5px';
+          closeButton.style.zIndex = 999;
+          // 将按钮添加到地图容器中
+          dischargeContainer.appendChild(closeButton);
+          // 添加点击事件监听器
+          closeButton.addEventListener('click', function () {
+            document.getElementById('chart-container').style.display = 'none';
+          });
+
+          var downloadButton = document.createElement('button');
+          downloadButton.innerHTML = '下载数据';
+          downloadButton.id = 'download-button';
+          downloadButton.style.position = 'absolute';
+          downloadButton.style.left = '440px';
+          downloadButton.style.top = '5px';
+          downloadButton.style.zIndex = 999;
+
+          // 将按钮添加到地图容器中
+          dischargeContainer.appendChild(downloadButton);
+          // 添加点击事件监听器
+          // 添加点击事件监听器
+          downloadButton.addEventListener('click', function () {
+            // 将数据转换为 CSV 格式
+            var csvContent = 'data:text/csv;charset=utf-8,';
+
+            // 添加 CSV 标题行
+            csvContent += 'Time,Discharge (Gt/yr)\n';
+
+            // 添加数据行
+            data.forEach(function (item) {
+              csvContent += item.time + ',' + item.discharge + '\n';
+            });
+
+            // 创建下载链接并设置文件名
+            var dataLink = document.createElement('a');
+            dataLink.href = encodeURI(csvContent);
+            dataLink.download = 'SE_Discharge.csv';
+            dataLink.click();
+          });
+          dischargeContainer.addEventListener('mousedown', startDrag);
+          function startDrag(e) {
+            e.preventDefault();
+
+            var initialX = e.clientX;
+            var initialY = e.clientY;
+            var startX = parseInt(dischargeContainer.style.left) || 0;
+            var startY = parseInt(dischargeContainer.style.top) || 0;
+
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleUp);
+
+            function handleMove(e) {
+              var offsetX = e.clientX - initialX;
+              var offsetY = e.clientY - initialY;
+
+              dischargeContainer.style.left = startX + offsetX + 'px';
+              dischargeContainer.style.top = startY + offsetY + 'px';
             }
 
-            var data = mergedResult;
-            var chartContainer = document.createElement('div');
-            chartContainer.setAttribute('id', 'totalChart');
-            chartContainer.style.width = '628px';
-            chartContainer.style.height = '400px';
-            chartContainer.style.left = '0px';
-            chartContainer.style.position = 'absolute';
-            chartContainer.style.backgroundColor = 'white';
-            chartContainer.style.zIndex = 999;
-            dischargeContainer.appendChild(chartContainer);
-            var myChart = echarts.init(chartContainer);
+            function handleUp() {
+              document.removeEventListener('mousemove', handleMove);
+              document.removeEventListener('mouseup', handleUp);
+            }
+          }
+          if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
+            document.getElementById('chart-container').style.display = 'none';
+          }
+        } else if (smb) {
+          var name = 'smb_se';
+          var title = 'SE';
+          var yName = 'SMB';
+          Promise.all([
+            fetch('./src/data/smb/SE_smb.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
 
             myChart.setOption({
               title: {
-                text: 'SE',   // 设置标题文本
+                text: title,   // 设置标题文本
                 textStyle: {              // 标题文字样式配置
                   color: 'black',
                   fontSize: 15,
                 },
                 left: 'center',   // 设置标题水平居中
-                top: '10px',
-              },
-              tooltip: {
-                trigger: "item",
+                top: '10px'
               },
               xAxis: {
-                type: 'time',
-                data: data.map(item => item.time),
-                min: '1986', // 设置 X 轴的最小值
-                max: '2023', // 设置 X 轴的最大值
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
                 axisLabel: {
                   fontFamily: 'Arial', // 设置字体
                   fontSize: 15,        // 设置字号
-                  color: '#333'        // 设置颜色
+                  color: '#333',        // 设置颜色
                 },
                 axisLine: {
                   show: false,
@@ -1996,7 +4963,7 @@ export default {
               },
               yAxis: {
                 type: 'value',
-                name: 'Discharge (Gt/yr)',
+                name: yName + ' (cm/yr)',
                 nameLocation: "middle",
                 nameTextStyle: {
                   fontSize: 15,
@@ -2022,19 +4989,13 @@ export default {
               },
               series: [
                 {
-                  type: 'scatter',
-                  name: 'discharge',
-                  data: data.map(item => [item.time, item.discharge]),
-                  color: 'red',
-                  tooltip: {
-                    trigger: 'item',
-                    formatter: function (params) {
-                      const year = params.value[0];
-                      const discharge = params.value[1].toFixed(3);
-                      return "time:" + year + "<br />" + "discharge: " + discharge;
-                    }
-                  }
-                }
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
               ],
               toolbox: {
                 feature: {
@@ -2049,56 +5010,52 @@ export default {
             // 创建一个按钮元素
             var closeButton = document.createElement('button');
             closeButton.innerHTML = '关闭';
-            closeButton.id = 'close-button';
+            closeButton.id = name + 'button';
             closeButton.style.position = 'absolute';
             closeButton.style.left = '580px';
             closeButton.style.top = '5px';
             closeButton.style.zIndex = 999;
             // 将按钮添加到地图容器中
-            dischargeContainer.appendChild(closeButton);
+            container.appendChild(closeButton);
             // 添加点击事件监听器
             closeButton.addEventListener('click', function () {
-              document.getElementById('chart-container').style.display = 'none';
+              mapContainer.removeChild(document.getElementById(name + 'container'));
             });
 
             var downloadButton = document.createElement('button');
             downloadButton.innerHTML = '下载数据';
-            downloadButton.id = 'download-button';
+            downloadButton.id = name + 'download-button';
             downloadButton.style.position = 'absolute';
             downloadButton.style.left = '440px';
             downloadButton.style.top = '5px';
             downloadButton.style.zIndex = 999;
 
             // 将按钮添加到地图容器中
-            dischargeContainer.appendChild(downloadButton);
-            // 添加点击事件监听器
-            // 添加点击事件监听器
+            container.appendChild(downloadButton);
+
             downloadButton.addEventListener('click', function () {
-              // 将数据转换为 CSV 格式
-              var csvContent = 'data:text/csv;charset=utf-8,';
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'se_smb.csv';
+              link.target = '_blank';
 
-              // 添加 CSV 标题行
-              csvContent += 'Time,Discharge (Gt/yr)\n';
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
 
-              // 添加数据行
-              data.forEach(function (item) {
-                csvContent += item.time + ',' + item.discharge + '\n';
-              });
-
-              // 创建下载链接并设置文件名
-              var dataLink = document.createElement('a');
-              dataLink.href = encodeURI(csvContent);
-              dataLink.download = 'SE_Discharge.csv';
-              dataLink.click();
+              // 清理临时链接
+              document.body.removeChild(link);
             });
-            dischargeContainer.addEventListener('mousedown', startDrag);
+
+            container.addEventListener('mousedown', startDrag);
             function startDrag(e) {
               e.preventDefault();
 
               var initialX = e.clientX;
               var initialY = e.clientY;
-              var startX = parseInt(dischargeContainer.style.left) || 0;
-              var startY = parseInt(dischargeContainer.style.top) || 0;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
 
               document.addEventListener('mousemove', handleMove);
               document.addEventListener('mouseup', handleUp);
@@ -2107,8 +5064,8 @@ export default {
                 var offsetX = e.clientX - initialX;
                 var offsetY = e.clientY - initialY;
 
-                dischargeContainer.style.left = startX + offsetX + 'px';
-                dischargeContainer.style.top = startY + offsetY + 'px';
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
               }
 
               function handleUp() {
@@ -2116,10 +5073,529 @@ export default {
                 document.removeEventListener('mouseup', handleUp);
               }
             }
-            if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
-              document.getElementById('chart-container').style.display = 'none';
+          });
+        }
+        else if (ru) {
+          var name = 'ru_se';
+          var title = 'SE';
+          var yName = 'Runoff';
+          Promise.all([
+            fetch('./src/data/ru/SE_ru.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
             }
-          }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'se_ru.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
+        }
+        else if (ev) {
+          var name = 'ev_se';
+          var title = 'SE';
+          var yName = 'EVAP + SUBL';
+          Promise.all([
+            fetch('./src/data/ev/SE_ev.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'se_ev.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
+        }
+        else if (pr) {
+          var name = 'pr_se';
+          var title = 'SE';
+          var yName = 'Precipitation';
+          Promise.all([
+            fetch('./src/data/pr/SE_pr.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'se_pr.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
         }
       });
 
@@ -2171,97 +5647,280 @@ export default {
           map.setLayoutProperty('gate_meta', 'visibility', 'visible');
           isClickEventEnabled = false;
           window.location.href = url + '/#/sw'
-        } else {
-          if (isClickEventEnabled) {
-            // 移除之前创建的表格
-            var chartContainer = document.getElementById('chart-container');
-            if (chartContainer) {
-              chartContainer.parentNode.removeChild(chartContainer);
+        } else if (isClickEventEnabled) {
+          // 移除之前创建的表格
+          var chartContainer = document.getElementById('chart-container');
+          if (chartContainer) {
+            chartContainer.parentNode.removeChild(chartContainer);
+          }
+
+          var dischargeContainer = document.createElement('div');
+          dischargeContainer.id = 'chart-container';
+          dischargeContainer.style.position = 'relative';
+          dischargeContainer.style.left = '0px';
+          dischargeContainer.style.top = '0px';
+
+          mapContainer.appendChild(dischargeContainer);
+
+          // 获取边界线图层的边界经纬度坐标
+          var boundaryFeatures = map.querySourceFeatures('greenlandSw');
+
+          // 获取圆圈图层的所有圆圈要素
+          var circleFeatures = map.querySourceFeatures('gate_meta');
+
+          // 创建一个空数组用于存储合并后的结果
+          var mergedArray = [];
+
+          // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
+          circleFeatures.forEach(function (circle) {
+            var circleCenter = circle.geometry.coordinates;
+
+            // 检查中心点是否位于边界线图层的边界内
+            if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
+              var data = JSON.parse(circle.properties.speeds);
+              mergedArray.push(data);
             }
+          });
 
-            var dischargeContainer = document.createElement('div');
-            dischargeContainer.id = 'chart-container';
-            dischargeContainer.style.position = 'relative';
-            dischargeContainer.style.left = '0px';
-            dischargeContainer.style.top = '0px';
-
-            mapContainer.appendChild(dischargeContainer);
-
-            // 获取边界线图层的边界经纬度坐标
-            var boundaryFeatures = map.querySourceFeatures('greenlandSw');
-
-            // 获取圆圈图层的所有圆圈要素
-            var circleFeatures = map.querySourceFeatures('gate_meta');
-
-            // 创建一个空数组用于存储合并后的结果
-            var mergedArray = [];
-
-            // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
-            circleFeatures.forEach(function (circle) {
-              var circleCenter = circle.geometry.coordinates;
-
-              // 检查中心点是否位于边界线图层的边界内
-              if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
-                var data = JSON.parse(circle.properties.speeds);
-                mergedArray.push(data);
+          const mergedResult = mergedArray.reduce((result, array) => {
+            array.forEach((item) => {
+              const existingItem = result.find((r) => r.time === item.time);
+              if (existingItem) {
+                existingItem.discharge += item.discharge;
+              } else {
+                result.push({ time: item.time, discharge: item.discharge });
               }
             });
+            return result;
+          }, []);
 
-            const mergedResult = mergedArray.reduce((result, array) => {
-              array.forEach((item) => {
-                const existingItem = result.find((r) => r.time === item.time);
-                if (existingItem) {
-                  existingItem.discharge += item.discharge;
-                } else {
-                  result.push({ time: item.time, discharge: item.discharge });
+          // 判断一个点是否位于边界线图层的边界内
+          function isPointWithinBoundary(point, boundaryFeatures) {
+            var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
+              return feature.geometry.coordinates;
+            }));
+            var pointOnLine = turf.point(point);
+            return turf.booleanPointInPolygon(pointOnLine, polygon);
+          }
+
+          var data = mergedResult;
+          var chartContainer = document.createElement('div');
+          chartContainer.setAttribute('id', 'totalChart');
+          chartContainer.style.width = '628px';
+          chartContainer.style.height = '400px';
+          chartContainer.style.left = '0px';
+          chartContainer.style.position = 'absolute';
+          chartContainer.style.backgroundColor = 'white';
+          chartContainer.style.zIndex = 999;
+          dischargeContainer.appendChild(chartContainer);
+          var myChart = echarts.init(chartContainer);
+
+          myChart.setOption({
+            title: {
+              text: 'SW',   // 设置标题文本
+              textStyle: {              // 标题文字样式配置
+                color: 'black',
+                fontSize: 15,
+              },
+              left: 'center',   // 设置标题水平居中
+              top: '10px',
+            },
+            tooltip: {
+              trigger: "item",
+            },
+            xAxis: {
+              type: 'time',
+              data: data.map(item => item.time),
+              min: '1986', // 设置 X 轴的最小值
+              max: '2023', // 设置 X 轴的最大值
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            yAxis: {
+              type: 'value',
+              name: 'Discharge (Gt/yr)',
+              nameLocation: "middle",
+              nameTextStyle: {
+                fontSize: 15,
+              },
+              nameGap: 40,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            grid: {
+              width: '80%',  // 设置宽度为80%
+              height: '70%',  // 设置高度为80%
+              left: '10%',
+              top: '15%',
+            },
+            series: [
+              {
+                type: 'scatter',
+                name: 'discharge',
+                data: data.map(item => [item.time, item.discharge]),
+                color: 'red',
+                tooltip: {
+                  trigger: 'item',
+                  formatter: function (params) {
+                    const year = params.value[0];
+                    const discharge = params.value[1].toFixed(3);
+                    return "time:" + year + "<br />" + "discharge: " + discharge;
+                  }
                 }
-              });
-              return result;
-            }, []);
+              }
+            ],
+            toolbox: {
+              feature: {
+                saveAsImage: {},
+              },
+              itemSize: 18,
+              itemGap: 20,
+              right: 70,
+            },
+          });
 
-            // 判断一个点是否位于边界线图层的边界内
-            function isPointWithinBoundary(point, boundaryFeatures) {
-              var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
-                return feature.geometry.coordinates;
-              }));
-              var pointOnLine = turf.point(point);
-              return turf.booleanPointInPolygon(pointOnLine, polygon);
+          // 创建一个按钮元素
+          var closeButton = document.createElement('button');
+          closeButton.innerHTML = '关闭';
+          closeButton.id = 'close-button';
+          closeButton.style.position = 'absolute';
+          closeButton.style.left = '580px';
+          closeButton.style.top = '5px';
+          closeButton.style.zIndex = 999;
+          // 将按钮添加到地图容器中
+          dischargeContainer.appendChild(closeButton);
+          // 添加点击事件监听器
+          closeButton.addEventListener('click', function () {
+            document.getElementById('chart-container').style.display = 'none';
+          });
+
+          var downloadButton = document.createElement('button');
+          downloadButton.innerHTML = '下载数据';
+          downloadButton.id = 'download-button';
+          downloadButton.style.position = 'absolute';
+          downloadButton.style.left = '440px';
+          downloadButton.style.top = '5px';
+          downloadButton.style.zIndex = 999;
+
+          // 将按钮添加到地图容器中
+          dischargeContainer.appendChild(downloadButton);
+          // 添加点击事件监听器
+          downloadButton.addEventListener('click', function () {
+            // 将数据转换为 CSV 格式
+            var csvContent = 'data:text/csv;charset=utf-8,';
+
+            // 添加 CSV 标题行
+            csvContent += 'Time,Discharge (Gt/yr)\n';
+
+            // 添加数据行
+            data.forEach(function (item) {
+              csvContent += item.time + ',' + item.discharge + '\n';
+            });
+
+            // 创建下载链接并设置文件名
+            var dataLink = document.createElement('a');
+            dataLink.href = encodeURI(csvContent);
+            dataLink.download = 'SW_Discharge.csv';
+            dataLink.click();
+          });
+          dischargeContainer.addEventListener('mousedown', startDrag);
+          function startDrag(e) {
+            e.preventDefault();
+
+            var initialX = e.clientX;
+            var initialY = e.clientY;
+            var startX = parseInt(dischargeContainer.style.left) || 0;
+            var startY = parseInt(dischargeContainer.style.top) || 0;
+
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleUp);
+
+            function handleMove(e) {
+              var offsetX = e.clientX - initialX;
+              var offsetY = e.clientY - initialY;
+
+              dischargeContainer.style.left = startX + offsetX + 'px';
+              dischargeContainer.style.top = startY + offsetY + 'px';
             }
 
-            var data = mergedResult;
-            var chartContainer = document.createElement('div');
-            chartContainer.setAttribute('id', 'totalChart');
-            chartContainer.style.width = '628px';
-            chartContainer.style.height = '400px';
-            chartContainer.style.left = '0px';
-            chartContainer.style.position = 'absolute';
-            chartContainer.style.backgroundColor = 'white';
-            chartContainer.style.zIndex = 999;
-            dischargeContainer.appendChild(chartContainer);
-            var myChart = echarts.init(chartContainer);
+            function handleUp() {
+              document.removeEventListener('mousemove', handleMove);
+              document.removeEventListener('mouseup', handleUp);
+            }
+          }
+          if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
+            document.getElementById('chart-container').style.display = 'none';
+          }
+        } else if (smb) {
+          var name = 'smb_sw';
+          var title = 'SW';
+          var yName = 'SMB';
+          Promise.all([
+            fetch('./src/data/smb/SW_smb.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
 
             myChart.setOption({
               title: {
-                text: 'SW',   // 设置标题文本
+                text: title,   // 设置标题文本
                 textStyle: {              // 标题文字样式配置
                   color: 'black',
                   fontSize: 15,
                 },
                 left: 'center',   // 设置标题水平居中
-                top: '10px',
-              },
-              tooltip: {
-                trigger: "item",
+                top: '10px'
               },
               xAxis: {
-                type: 'time',
-                data: data.map(item => item.time),
-                min: '1986', // 设置 X 轴的最小值
-                max: '2023', // 设置 X 轴的最大值
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
                 axisLabel: {
                   fontFamily: 'Arial', // 设置字体
                   fontSize: 15,        // 设置字号
-                  color: '#333'        // 设置颜色
+                  color: '#333',        // 设置颜色
                 },
                 axisLine: {
                   show: false,
@@ -2272,7 +5931,7 @@ export default {
               },
               yAxis: {
                 type: 'value',
-                name: 'Discharge (Gt/yr)',
+                name: yName + ' (cm/yr)',
                 nameLocation: "middle",
                 nameTextStyle: {
                   fontSize: 15,
@@ -2298,19 +5957,13 @@ export default {
               },
               series: [
                 {
-                  type: 'scatter',
-                  name: 'discharge',
-                  data: data.map(item => [item.time, item.discharge]),
-                  color: 'red',
-                  tooltip: {
-                    trigger: 'item',
-                    formatter: function (params) {
-                      const year = params.value[0];
-                      const discharge = params.value[1].toFixed(3);
-                      return "time:" + year + "<br />" + "discharge: " + discharge;
-                    }
-                  }
-                }
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
               ],
               toolbox: {
                 feature: {
@@ -2325,55 +5978,52 @@ export default {
             // 创建一个按钮元素
             var closeButton = document.createElement('button');
             closeButton.innerHTML = '关闭';
-            closeButton.id = 'close-button';
+            closeButton.id = name + 'button';
             closeButton.style.position = 'absolute';
             closeButton.style.left = '580px';
             closeButton.style.top = '5px';
             closeButton.style.zIndex = 999;
             // 将按钮添加到地图容器中
-            dischargeContainer.appendChild(closeButton);
+            container.appendChild(closeButton);
             // 添加点击事件监听器
             closeButton.addEventListener('click', function () {
-              document.getElementById('chart-container').style.display = 'none';
+              mapContainer.removeChild(document.getElementById(name + 'container'));
             });
 
             var downloadButton = document.createElement('button');
             downloadButton.innerHTML = '下载数据';
-            downloadButton.id = 'download-button';
+            downloadButton.id = name + 'download-button';
             downloadButton.style.position = 'absolute';
             downloadButton.style.left = '440px';
             downloadButton.style.top = '5px';
             downloadButton.style.zIndex = 999;
 
             // 将按钮添加到地图容器中
-            dischargeContainer.appendChild(downloadButton);
-            // 添加点击事件监听器
+            container.appendChild(downloadButton);
+
             downloadButton.addEventListener('click', function () {
-              // 将数据转换为 CSV 格式
-              var csvContent = 'data:text/csv;charset=utf-8,';
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'sw_smb.csv';
+              link.target = '_blank';
 
-              // 添加 CSV 标题行
-              csvContent += 'Time,Discharge (Gt/yr)\n';
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
 
-              // 添加数据行
-              data.forEach(function (item) {
-                csvContent += item.time + ',' + item.discharge + '\n';
-              });
-
-              // 创建下载链接并设置文件名
-              var dataLink = document.createElement('a');
-              dataLink.href = encodeURI(csvContent);
-              dataLink.download = 'SW_Discharge.csv';
-              dataLink.click();
+              // 清理临时链接
+              document.body.removeChild(link);
             });
-            dischargeContainer.addEventListener('mousedown', startDrag);
+
+            container.addEventListener('mousedown', startDrag);
             function startDrag(e) {
               e.preventDefault();
 
               var initialX = e.clientX;
               var initialY = e.clientY;
-              var startX = parseInt(dischargeContainer.style.left) || 0;
-              var startY = parseInt(dischargeContainer.style.top) || 0;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
 
               document.addEventListener('mousemove', handleMove);
               document.addEventListener('mouseup', handleUp);
@@ -2382,8 +6032,8 @@ export default {
                 var offsetX = e.clientX - initialX;
                 var offsetY = e.clientY - initialY;
 
-                dischargeContainer.style.left = startX + offsetX + 'px';
-                dischargeContainer.style.top = startY + offsetY + 'px';
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
               }
 
               function handleUp() {
@@ -2391,10 +6041,529 @@ export default {
                 document.removeEventListener('mouseup', handleUp);
               }
             }
-            if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
-              document.getElementById('chart-container').style.display = 'none';
+          });
+        }
+        else if (ru) {
+          var name = 'ru_sw';
+          var title = 'SW';
+          var yName = 'Runoff';
+          Promise.all([
+            fetch('./src/data/ru/SW_ru.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
             }
-          }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'sw_ru.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
+        }
+        else if (ev) {
+          var name = 'ev_sw';
+          var title = 'SW';
+          var yName = 'EVAP + SUBL';
+          Promise.all([
+            fetch('./src/data/ev/SW_ev.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'sw_ev.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
+        }
+        else if (pr) {
+          var name = 'pr_sw';
+          var title = 'SW';
+          var yName = 'Precipitation';
+          Promise.all([
+            fetch('./src/data/pr/SW_pr.csv').then(response => response.text()),
+          ]).then(([csvData]) => {
+            // 解析CSV数据
+            const rows = csvData.split('\n'); // 将数据按行分割
+            const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+            if (document.getElementById(name + 'container')) {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            }
+            var container = document.createElement('div');
+            container.id = name + 'container';
+            container.style.position = 'relative';
+            container.style.left = '0px';
+            container.style.top = '0px';
+
+            mapContainer.appendChild(container);
+
+            var chat = document.createElement('div');
+            chat.setAttribute('id', name + 'chart');
+            chat.style.width = '628px';
+            chat.style.height = '400px';
+            chat.style.left = '0px';
+            chat.style.position = 'absolute';
+            chat.style.backgroundColor = 'white';
+            chat.style.zIndex = 999;
+            container.appendChild(chat);
+            var myChart = echarts.init(chat);
+
+            myChart.setOption({
+              title: {
+                text: title,   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px'
+              },
+              xAxis: {
+                type: "value",
+                data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+                min: 2000,
+                max: 2025,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333',        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: yName + ' (mm/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: "scatter",
+                  data: data,
+                  itemStyle: {
+                    // 修改散点的颜色
+                    color: 'rgba(255, 0, 0, 0.8)',
+                  },
+                },
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = name + 'button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            container.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              mapContainer.removeChild(document.getElementById(name + 'container'));
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = name + 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            container.appendChild(downloadButton);
+
+            downloadButton.addEventListener('click', function () {
+              // 创建一个临时链接
+              const link = document.createElement('a');
+              link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+              link.download = 'sw_pr.csv';
+              link.target = '_blank';
+
+              // 将链接添加到文档中并模拟点击
+              document.body.appendChild(link);
+              link.click();
+
+              // 清理临时链接
+              document.body.removeChild(link);
+            });
+
+            container.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(container.style.left) || 0;
+              var startY = parseInt(container.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                container.style.left = startX + offsetX + 'px';
+                container.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+          });
         }
       });
 
@@ -2414,6 +6583,13 @@ export default {
         nwFlag = true;
         seFlag = true;
         swFlag = true;
+
+        isClickEventEnabled = false;
+
+        smb = false;
+        ru = false;
+        ev = false;
+        pr = false;
 
         // 设置地图中心点和缩放级别
         map.setCenter([-42.6043, 90]);
@@ -2450,21 +6626,12 @@ export default {
         container.appendChild(GraceVelcolorbar);
         legendsContainer.append(legendContainer);
 
-        isClickEventEnabled = false;
-
         map.setLayoutProperty('Grace_Vel', 'visibility', 'visible');
         map.setLayoutProperty('E_rate', 'visibility', 'none');
         map.setLayoutProperty('R_rate', 'visibility', 'none');
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'visible');
-
-        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'visible');
-        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'visible');
-        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'visible');
-        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'visible');
-        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'visible');
-        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'visible');
         // 在单击时将用户重定向到新页面
         window.location.href = url + '/#/greenland';
       });
@@ -2480,12 +6647,194 @@ export default {
 
       // 添加点击事件监听器
       eRateButton.addEventListener('click', function () {
+
+        var name = 'ev_greenland';
+        var title = 'Greenland';
+        var yName = 'EVAP + SUBL';
+        Promise.all([
+          fetch('./src/data/ev/Greenland_ev.csv').then(response => response.text()),
+        ]).then(([csvData]) => {
+          // 解析CSV数据
+          const rows = csvData.split('\n'); // 将数据按行分割
+          const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+          if (document.getElementById(name + 'container')) {
+            mapContainer.removeChild(document.getElementById(name + 'container'));
+          }
+
+          var container = document.createElement('div');
+          container.id = name + 'container';
+          container.style.position = 'relative';
+          container.style.left = '0px';
+          container.style.top = '0px';
+
+          mapContainer.appendChild(container);
+
+          var chat = document.createElement('div');
+          chat.setAttribute('id', name + 'chart');
+          chat.style.width = '628px';
+          chat.style.height = '400px';
+          chat.style.left = '0px';
+          chat.style.position = 'absolute';
+          chat.style.backgroundColor = 'white';
+          chat.style.zIndex = 999;
+          container.appendChild(chat);
+          var myChart = echarts.init(chat);
+
+          myChart.setOption({
+            title: {
+              text: title,   // 设置标题文本
+              textStyle: {              // 标题文字样式配置
+                color: 'black',
+                fontSize: 15,
+              },
+              left: 'center',   // 设置标题水平居中
+              top: '10px'
+            },
+            xAxis: {
+              type: "value",
+              data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+              min: 2000,
+              max: 2025,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333',        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            yAxis: {
+              type: 'value',
+              name: yName + ' (mm/yr)',
+              nameLocation: "middle",
+              nameTextStyle: {
+                fontSize: 15,
+              },
+              nameGap: 40,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            grid: {
+              width: '80%',  // 设置宽度为80%
+              height: '70%',  // 设置高度为80%
+              left: '10%',
+              top: '15%',
+            },
+            series: [
+              {
+                type: "scatter",
+                data: data,
+                itemStyle: {
+                  // 修改散点的颜色
+                  color: 'rgba(255, 0, 0, 0.8)',
+                },
+              },
+            ],
+            toolbox: {
+              feature: {
+                saveAsImage: {},
+              },
+              itemSize: 18,
+              itemGap: 20,
+              right: 70,
+            },
+          });
+
+          // 创建一个按钮元素
+          var closeButton = document.createElement('button');
+          closeButton.innerHTML = '关闭';
+          closeButton.id = name + 'button';
+          closeButton.style.position = 'absolute';
+          closeButton.style.left = '580px';
+          closeButton.style.top = '5px';
+          closeButton.style.zIndex = 999;
+          // 将按钮添加到地图容器中
+          container.appendChild(closeButton);
+          // 添加点击事件监听器
+          closeButton.addEventListener('click', function () {
+            mapContainer.removeChild(document.getElementById(name + 'container'));
+          });
+
+          var downloadButton = document.createElement('button');
+          downloadButton.innerHTML = '下载数据';
+          downloadButton.id = name + 'download-button';
+          downloadButton.style.position = 'absolute';
+          downloadButton.style.left = '440px';
+          downloadButton.style.top = '5px';
+          downloadButton.style.zIndex = 999;
+
+          // 将按钮添加到地图容器中
+          container.appendChild(downloadButton);
+
+          downloadButton.addEventListener('click', function () {
+            // 创建一个临时链接
+            const link = document.createElement('a');
+            link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+            link.download = 'Greemland_ev.csv';
+            link.target = '_blank';
+
+            // 将链接添加到文档中并模拟点击
+            document.body.appendChild(link);
+            link.click();
+
+            // 清理临时链接
+            document.body.removeChild(link);
+          });
+
+          container.addEventListener('mousedown', startDrag);
+          function startDrag(e) {
+            e.preventDefault();
+
+            var initialX = e.clientX;
+            var initialY = e.clientY;
+            var startX = parseInt(container.style.left) || 0;
+            var startY = parseInt(container.style.top) || 0;
+
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleUp);
+
+            function handleMove(e) {
+              var offsetX = e.clientX - initialX;
+              var offsetY = e.clientY - initialY;
+
+              container.style.left = startX + offsetX + 'px';
+              container.style.top = startY + offsetY + 'px';
+            }
+
+            function handleUp() {
+              document.removeEventListener('mousemove', handleMove);
+              document.removeEventListener('mouseup', handleUp);
+            }
+          }
+        });
+
         cwFlag = false;
         neFlag = false;
         noFlag = false;
         nwFlag = false;
         seFlag = false;
         swFlag = false;
+
+        isClickEventEnabled = false;
+
+        smb = false;
+        ru = false;
+        ev = true;
+        pr = false;
 
         if (container.contains(GraceVellabel)) {
           container.removeChild(GraceVellabel);
@@ -2526,16 +6875,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-
-        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'none');
       });
-
-      isClickEventEnabled = false;
 
       // 创建一个按钮元素
       var rRateButton = document.createElement('button');
@@ -2548,12 +6888,194 @@ export default {
 
       // 添加点击事件监听器
       rRateButton.addEventListener('click', function () {
+
+        var name = 'ru_greenland';
+        var title = 'Greenland';
+        var yName = 'Runoff';
+        Promise.all([
+          fetch('./src/data/ru/Greenland_ru.csv').then(response => response.text()),
+        ]).then(([csvData]) => {
+          // 解析CSV数据
+          const rows = csvData.split('\n'); // 将数据按行分割
+          const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+          if (document.getElementById(name + 'container')) {
+            mapContainer.removeChild(document.getElementById(name + 'container'));
+          }
+
+          var container = document.createElement('div');
+          container.id = name + 'container';
+          container.style.position = 'relative';
+          container.style.left = '0px';
+          container.style.top = '0px';
+
+          mapContainer.appendChild(container);
+
+          var chat = document.createElement('div');
+          chat.setAttribute('id', name + 'chart');
+          chat.style.width = '628px';
+          chat.style.height = '400px';
+          chat.style.left = '0px';
+          chat.style.position = 'absolute';
+          chat.style.backgroundColor = 'white';
+          chat.style.zIndex = 999;
+          container.appendChild(chat);
+          var myChart = echarts.init(chat);
+
+          myChart.setOption({
+            title: {
+              text: title,   // 设置标题文本
+              textStyle: {              // 标题文字样式配置
+                color: 'black',
+                fontSize: 15,
+              },
+              left: 'center',   // 设置标题水平居中
+              top: '10px'
+            },
+            xAxis: {
+              type: "value",
+              data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+              min: 2000,
+              max: 2025,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333',        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            yAxis: {
+              type: 'value',
+              name: yName + ' (mm/yr)',
+              nameLocation: "middle",
+              nameTextStyle: {
+                fontSize: 15,
+              },
+              nameGap: 40,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            grid: {
+              width: '80%',  // 设置宽度为80%
+              height: '70%',  // 设置高度为80%
+              left: '10%',
+              top: '15%',
+            },
+            series: [
+              {
+                type: "scatter",
+                data: data,
+                itemStyle: {
+                  // 修改散点的颜色
+                  color: 'rgba(255, 0, 0, 0.8)',
+                },
+              },
+            ],
+            toolbox: {
+              feature: {
+                saveAsImage: {},
+              },
+              itemSize: 18,
+              itemGap: 20,
+              right: 70,
+            },
+          });
+
+          // 创建一个按钮元素
+          var closeButton = document.createElement('button');
+          closeButton.innerHTML = '关闭';
+          closeButton.id = name + 'button';
+          closeButton.style.position = 'absolute';
+          closeButton.style.left = '580px';
+          closeButton.style.top = '5px';
+          closeButton.style.zIndex = 999;
+          // 将按钮添加到地图容器中
+          container.appendChild(closeButton);
+          // 添加点击事件监听器
+          closeButton.addEventListener('click', function () {
+            mapContainer.removeChild(document.getElementById(name + 'container'));
+          });
+
+          var downloadButton = document.createElement('button');
+          downloadButton.innerHTML = '下载数据';
+          downloadButton.id = name + 'download-button';
+          downloadButton.style.position = 'absolute';
+          downloadButton.style.left = '440px';
+          downloadButton.style.top = '5px';
+          downloadButton.style.zIndex = 999;
+
+          // 将按钮添加到地图容器中
+          container.appendChild(downloadButton);
+
+          downloadButton.addEventListener('click', function () {
+            // 创建一个临时链接
+            const link = document.createElement('a');
+            link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+            link.download = 'Greemland_ru.csv';
+            link.target = '_blank';
+
+            // 将链接添加到文档中并模拟点击
+            document.body.appendChild(link);
+            link.click();
+
+            // 清理临时链接
+            document.body.removeChild(link);
+          });
+
+          container.addEventListener('mousedown', startDrag);
+          function startDrag(e) {
+            e.preventDefault();
+
+            var initialX = e.clientX;
+            var initialY = e.clientY;
+            var startX = parseInt(container.style.left) || 0;
+            var startY = parseInt(container.style.top) || 0;
+
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleUp);
+
+            function handleMove(e) {
+              var offsetX = e.clientX - initialX;
+              var offsetY = e.clientY - initialY;
+
+              container.style.left = startX + offsetX + 'px';
+              container.style.top = startY + offsetY + 'px';
+            }
+
+            function handleUp() {
+              document.removeEventListener('mousemove', handleMove);
+              document.removeEventListener('mouseup', handleUp);
+            }
+          }
+        });
+
         cwFlag = false;
         neFlag = false;
         noFlag = false;
         nwFlag = false;
         seFlag = false;
         swFlag = false;
+
+        isClickEventEnabled = false;
+
+        smb = false;
+        ru = true;
+        ev = false;
+        pr = false;
 
         if (container.contains(GraceVellabel)) {
           container.removeChild(GraceVellabel);
@@ -2594,16 +7116,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-
-        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'none');
       });
-
-      isClickEventEnabled = false;
 
       // 创建一个按钮元素
       var smbRateButton = document.createElement('button');
@@ -2616,12 +7129,194 @@ export default {
 
       // 添加点击事件监听器
       smbRateButton.addEventListener('click', function () {
+
+        var name = 'smb_greenland';
+        var title = 'Greenland';
+        var yName = 'SMB';
+        Promise.all([
+          fetch('./src/data/smb/Greenland_smb.csv').then(response => response.text()),
+        ]).then(([csvData]) => {
+          // 解析CSV数据
+          const rows = csvData.split('\n'); // 将数据按行分割
+          const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+          if (document.getElementById(name + 'container')) {
+            mapContainer.removeChild(document.getElementById(name + 'container'));
+          }
+
+          var container = document.createElement('div');
+          container.id = name + 'container';
+          container.style.position = 'relative';
+          container.style.left = '0px';
+          container.style.top = '0px';
+
+          mapContainer.appendChild(container);
+
+          var chat = document.createElement('div');
+          chat.setAttribute('id', name + 'chart');
+          chat.style.width = '628px';
+          chat.style.height = '400px';
+          chat.style.left = '0px';
+          chat.style.position = 'absolute';
+          chat.style.backgroundColor = 'white';
+          chat.style.zIndex = 999;
+          container.appendChild(chat);
+          var myChart = echarts.init(chat);
+
+          myChart.setOption({
+            title: {
+              text: title,   // 设置标题文本
+              textStyle: {              // 标题文字样式配置
+                color: 'black',
+                fontSize: 15,
+              },
+              left: 'center',   // 设置标题水平居中
+              top: '10px'
+            },
+            xAxis: {
+              type: "value",
+              data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+              min: 2000,
+              max: 2025,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333',        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            yAxis: {
+              type: 'value',
+              name: yName + ' (cm/yr)',
+              nameLocation: "middle",
+              nameTextStyle: {
+                fontSize: 15,
+              },
+              nameGap: 40,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            grid: {
+              width: '80%',  // 设置宽度为80%
+              height: '70%',  // 设置高度为80%
+              left: '10%',
+              top: '15%',
+            },
+            series: [
+              {
+                type: "scatter",
+                data: data,
+                itemStyle: {
+                  // 修改散点的颜色
+                  color: 'rgba(255, 0, 0, 0.8)',
+                },
+              },
+            ],
+            toolbox: {
+              feature: {
+                saveAsImage: {},
+              },
+              itemSize: 18,
+              itemGap: 20,
+              right: 70,
+            },
+          });
+
+          // 创建一个按钮元素
+          var closeButton = document.createElement('button');
+          closeButton.innerHTML = '关闭';
+          closeButton.id = name + 'button';
+          closeButton.style.position = 'absolute';
+          closeButton.style.left = '580px';
+          closeButton.style.top = '5px';
+          closeButton.style.zIndex = 999;
+          // 将按钮添加到地图容器中
+          container.appendChild(closeButton);
+          // 添加点击事件监听器
+          closeButton.addEventListener('click', function () {
+            mapContainer.removeChild(document.getElementById(name + 'container'));
+          });
+
+          var downloadButton = document.createElement('button');
+          downloadButton.innerHTML = '下载数据';
+          downloadButton.id = name + 'download-button';
+          downloadButton.style.position = 'absolute';
+          downloadButton.style.left = '440px';
+          downloadButton.style.top = '5px';
+          downloadButton.style.zIndex = 999;
+
+          // 将按钮添加到地图容器中
+          container.appendChild(downloadButton);
+
+          downloadButton.addEventListener('click', function () {
+            // 创建一个临时链接
+            const link = document.createElement('a');
+            link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+            link.download = 'Greemland_smb.csv';
+            link.target = '_blank';
+
+            // 将链接添加到文档中并模拟点击
+            document.body.appendChild(link);
+            link.click();
+
+            // 清理临时链接
+            document.body.removeChild(link);
+          });
+
+          container.addEventListener('mousedown', startDrag);
+          function startDrag(e) {
+            e.preventDefault();
+
+            var initialX = e.clientX;
+            var initialY = e.clientY;
+            var startX = parseInt(container.style.left) || 0;
+            var startY = parseInt(container.style.top) || 0;
+
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleUp);
+
+            function handleMove(e) {
+              var offsetX = e.clientX - initialX;
+              var offsetY = e.clientY - initialY;
+
+              container.style.left = startX + offsetX + 'px';
+              container.style.top = startY + offsetY + 'px';
+            }
+
+            function handleUp() {
+              document.removeEventListener('mousemove', handleMove);
+              document.removeEventListener('mouseup', handleUp);
+            }
+          }
+        });
+
         cwFlag = false;
         neFlag = false;
         noFlag = false;
         nwFlag = false;
         seFlag = false;
         swFlag = false;
+
+        isClickEventEnabled = false;
+
+        smb = true;
+        ru = false;
+        ev = false;
+        pr = false;
 
         if (container.contains(GraceVellabel)) {
           container.removeChild(GraceVellabel);
@@ -2663,15 +7358,7 @@ export default {
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
 
-        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'none');
       });
-
-      isClickEventEnabled = false;
 
       // 创建一个按钮元素
       var pRateButton = document.createElement('button');
@@ -2684,12 +7371,194 @@ export default {
 
       // 添加点击事件监听器
       pRateButton.addEventListener('click', function () {
+
+        var name = 'pr_greenland';
+        var title = 'Greenland';
+        var yName = 'Precipitation';
+        Promise.all([
+          fetch('./src/data/pr/Greenland_pr.csv').then(response => response.text()),
+        ]).then(([csvData]) => {
+          // 解析CSV数据
+          const rows = csvData.split('\n'); // 将数据按行分割
+          const data = rows.map(row => row.split(',')); // 将每行数据按逗号分割成列
+
+          if (document.getElementById(name + 'container')) {
+            mapContainer.removeChild(document.getElementById(name + 'container'));
+          }
+
+          var container = document.createElement('div');
+          container.id = name + 'container';
+          container.style.position = 'relative';
+          container.style.left = '0px';
+          container.style.top = '0px';
+
+          mapContainer.appendChild(container);
+
+          var chat = document.createElement('div');
+          chat.setAttribute('id', name + 'chart');
+          chat.style.width = '628px';
+          chat.style.height = '400px';
+          chat.style.left = '0px';
+          chat.style.position = 'absolute';
+          chat.style.backgroundColor = 'white';
+          chat.style.zIndex = 999;
+          container.appendChild(chat);
+          var myChart = echarts.init(chat);
+
+          myChart.setOption({
+            title: {
+              text: title,   // 设置标题文本
+              textStyle: {              // 标题文字样式配置
+                color: 'black',
+                fontSize: 15,
+              },
+              left: 'center',   // 设置标题水平居中
+              top: '10px'
+            },
+            xAxis: {
+              type: "value",
+              data: ["2000", "2005", "2010", "2015", "2020", "2025"],
+              min: 2000,
+              max: 2025,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333',        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            yAxis: {
+              type: 'value',
+              name: yName + ' (mm/yr)',
+              nameLocation: "middle",
+              nameTextStyle: {
+                fontSize: 15,
+              },
+              nameGap: 40,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            grid: {
+              width: '80%',  // 设置宽度为80%
+              height: '70%',  // 设置高度为80%
+              left: '10%',
+              top: '15%',
+            },
+            series: [
+              {
+                type: "scatter",
+                data: data,
+                itemStyle: {
+                  // 修改散点的颜色
+                  color: 'rgba(255, 0, 0, 0.8)',
+                },
+              },
+            ],
+            toolbox: {
+              feature: {
+                saveAsImage: {},
+              },
+              itemSize: 18,
+              itemGap: 20,
+              right: 70,
+            },
+          });
+
+          // 创建一个按钮元素
+          var closeButton = document.createElement('button');
+          closeButton.innerHTML = '关闭';
+          closeButton.id = name + 'button';
+          closeButton.style.position = 'absolute';
+          closeButton.style.left = '580px';
+          closeButton.style.top = '5px';
+          closeButton.style.zIndex = 999;
+          // 将按钮添加到地图容器中
+          container.appendChild(closeButton);
+          // 添加点击事件监听器
+          closeButton.addEventListener('click', function () {
+            mapContainer.removeChild(document.getElementById(name + 'container'));
+          });
+
+          var downloadButton = document.createElement('button');
+          downloadButton.innerHTML = '下载数据';
+          downloadButton.id = name + 'download-button';
+          downloadButton.style.position = 'absolute';
+          downloadButton.style.left = '440px';
+          downloadButton.style.top = '5px';
+          downloadButton.style.zIndex = 999;
+
+          // 将按钮添加到地图容器中
+          container.appendChild(downloadButton);
+
+          downloadButton.addEventListener('click', function () {
+            // 创建一个临时链接
+            const link = document.createElement('a');
+            link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData);
+            link.download = 'Greemland_pr.csv';
+            link.target = '_blank';
+
+            // 将链接添加到文档中并模拟点击
+            document.body.appendChild(link);
+            link.click();
+
+            // 清理临时链接
+            document.body.removeChild(link);
+          });
+
+          container.addEventListener('mousedown', startDrag);
+          function startDrag(e) {
+            e.preventDefault();
+
+            var initialX = e.clientX;
+            var initialY = e.clientY;
+            var startX = parseInt(container.style.left) || 0;
+            var startY = parseInt(container.style.top) || 0;
+
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleUp);
+
+            function handleMove(e) {
+              var offsetX = e.clientX - initialX;
+              var offsetY = e.clientY - initialY;
+
+              container.style.left = startX + offsetX + 'px';
+              container.style.top = startY + offsetY + 'px';
+            }
+
+            function handleUp() {
+              document.removeEventListener('mousemove', handleMove);
+              document.removeEventListener('mouseup', handleUp);
+            }
+          }
+        });
+
         cwFlag = false;
         neFlag = false;
         noFlag = false;
         nwFlag = false;
         seFlag = false;
         swFlag = false;
+
+        isClickEventEnabled = false;
+
+        smb = false;
+        ru = false;
+        ev = false;
+        pr = true;
 
         if (container.contains(GraceVellabel)) {
           container.removeChild(GraceVellabel);
@@ -2730,16 +7599,7 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'visible');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-
-        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'none');
       });
-
-      isClickEventEnabled = false;
 
       // 创建一个按钮元素
       var dischargeButton = document.createElement('button');
@@ -2759,6 +7619,11 @@ export default {
         nwFlag = false;
         seFlag = false;
         swFlag = false;
+
+        var smb = false;
+        var ru = false;
+        var ev = false;
+        var pr = false;
 
         map.boxZoom.enable();
         map.dragPan.enable();
@@ -2805,13 +7670,6 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'visible');
-
-        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'visible');
-        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'visible');
-        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'visible');
-        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'visible');
-        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'visible');
-        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'visible');
 
       });
 
