@@ -1,18 +1,73 @@
 <template>
-    <div style="position: relative; z-index: 999;" id="chart">
+    <div style="position: relative; z-index: 999;" id="chartDiv" @mousedown="startDrag"
+        :style="{ left: chartLeft + 'px', top: chartTop + 'px' }">
         <div id="echarts" style="width: 500px; height: 380px; background-color: white;"></div>
-        <input type="button" value="关闭" @click="close"
-            style="position: absolute; top: 5px; left: 450px; background-color: transparent;">
+        <button @click="downloadData" style="position: absolute; top: 5px; left: 320px;">下载数据</button>
+        <button @click="close" style="position: absolute; top: 5px; left: 450px;">关闭</button>
     </div>
 </template>
 <script setup>
+import { ref, reactive } from 'vue';
 import * as echarts from 'echarts';
-import jStat from 'jstat';
 import regression from 'regression';
+import jStat from 'jstat';
+
+//让图可以移动
+const chartLeft = ref(0);
+const chartTop = ref(0);
+
+function startDrag(e) {
+    const initialX = e.clientX;
+    const initialY = e.clientY;
+    const initialLeft = chartLeft.value;
+    const initialTop = chartTop.value;
+
+    function handleMove(e) {
+        const offsetX = e.clientX - initialX;
+        const offsetY = e.clientY - initialY;
+
+        chartLeft.value = initialLeft + offsetX;
+        chartTop.value = initialTop + offsetY;
+    }
+
+    function handleUp() {
+        window.removeEventListener('mousemove', handleMove);
+        window.removeEventListener('mouseup', handleUp);
+    }
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+}
+
+function downloadData() {
+    Promise.all([
+        fetch('./src/data/cw_Grace_mass.json').then(response => response.json()),
+        fetch('./src/data/cw_MBM_mass.json').then(response => response.json())
+    ]).then(([GraceData, MBMData]) => {
+        const graceDataContent = JSON.stringify(GraceData);
+        const mbmDataContent = JSON.stringify(MBMData);
+
+        const graceDataBlob = new Blob([graceDataContent], { type: 'application/json' });
+        const mbmDataBlob = new Blob([mbmDataContent], { type: 'application/json' });
+
+        const graceDataFileName = 'cw_Grace_mass.json';
+        const mbmDataFileName = 'cw_MBM_mass.json';
+
+        const graceDataLink = document.createElement('a');
+        graceDataLink.href = window.URL.createObjectURL(graceDataBlob);
+        graceDataLink.download = graceDataFileName;
+        graceDataLink.click();
+
+        const mbmDataLink = document.createElement('a');
+        mbmDataLink.href = window.URL.createObjectURL(mbmDataBlob);
+        mbmDataLink.download = mbmDataFileName;
+        mbmDataLink.click();
+    });
+}
 
 function close() {
     var url = 'http://localhost:7070';
-    document.getElementById('chart').style.display = 'none';
+    document.getElementById('chartDiv').style.display = 'none';
     window.location.href =  url + '/#/';
 }
 
@@ -32,6 +87,7 @@ Promise.all([
                 fontSize: 15,
             },
             left: 'center',   // 设置标题水平居中
+            top: '10px',
         },
         tooltip: {
             trigger: "item",
@@ -47,7 +103,7 @@ Promise.all([
                 fontSize: 15,        // 设置字号
                 color: '#333',        // 设置颜色
                 formatter: function (value) {
-                    return value + '年';
+                    return value;
                 }
             },
             axisLine: {

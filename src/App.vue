@@ -3,11 +3,12 @@
   <div>
     <router-view></router-view>
   </div>
-  <!-- <div id="discharge" style="width: 500px; height: 300px; right: 100px; position: absolute;"></div> -->
 </template>
 <script>
 import mapboxgl from 'mapbox-gl';
 import * as echarts from 'echarts';
+// 引入Turf库
+import * as turf from '@turf/turf';
 export default {
   name: 'App',
   mounted() {
@@ -18,9 +19,8 @@ export default {
       style: 'mapbox://styles/mapbox/light-v10', //地图样式
       center: [-42.6043, 90], //格陵兰岛中心点坐标
       zoom: 2, //缩放大小
-      scrollZoom: false, // 禁用滚动缩放功能
-      dragPan: false, //禁止移动地图
       doubleClickZoom: false,
+      dragRotate: false, // 禁止地图旋转
     });
     map.on('load', function () {
       //添加流域边界数据
@@ -54,11 +54,90 @@ export default {
         data: './src/data/sw_boundary.json'
       });
 
+      // 获取地理坐标的像素坐标
+      var coordinates = [-65, 58]; // 替换为您想要显示容器的地理坐标
+      var pixelCoordinates = map.project(coordinates);
+
+      //创建colorbar容器
+      var container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.width = '280px';
+
+      // 设置容器的位置
+      container.style.left = pixelCoordinates.x + 'px';
+      container.style.top = pixelCoordinates.y + 'px';
+
+      // 将容器添加到地图容器中
+      var mapContainer = document.getElementById('map');
+      mapContainer.appendChild(container);
+
+      // 监听地图移动事件
+      map.on('move', function () {
+        // 获取地理坐标的像素坐标
+        var coordinates = [-65, 58]; // 替换为您想要显示容器的地理坐标
+        var pixelCoordinates = map.project(coordinates);
+
+        // 设置容器的位置
+        container.style.left = pixelCoordinates.x + 'px';
+        container.style.top = pixelCoordinates.y + 'px';
+      });
+
+      // 监听地图缩放事件
+      map.on('zoom', function () {
+        // 获取当前地图缩放级别
+        var zoom = map.getZoom();
+
+        // 根据缩放级别控制容器的可见性
+        if (zoom >= 2.5) {
+          container.style.display = 'none'; // 当地图缩放到达特定倍数时隐藏容器
+        } else if (zoom <= 1.8) {
+          container.style.display = 'none'; // 当地图缩放到达特定倍数时隐藏容器
+        } else {
+          container.style.display = 'block'; // 在其他情况下显示容器
+        }
+      });
+
       //添加Grace_vel数据
       map.addSource('Grace_Vel', {
         type: 'geojson',
         data: './src/data/Grace_vel.json'
       });
+
+      //设置colorbar
+      var GraceVelcolors = ['red', 'white', 'blue'];
+      var GraceVelintervals = [-80, 0, 10];
+      let GraceVelgradient = 'linear-gradient(to right, ';
+      var GraceVellabel = document.createElement('div');
+      GraceVellabel.innerHTML = 'GRACE Mass Change (cm/year)';
+      GraceVellabel.style.textAlign = 'center';
+      GraceVellabel.style.fontSize = '15px';
+      container.appendChild(GraceVellabel);
+      var GraceVelcolorbar = document.createElement('div');
+      GraceVelcolorbar.style.width = '280px';
+      GraceVelcolorbar.style.height = '18px';
+      container.appendChild(GraceVelcolorbar);
+      for (let i = 0; i < GraceVelcolors.length; i++) {
+        GraceVelgradient += GraceVelcolors[i] + ' ' + ((GraceVelintervals[i] - GraceVelintervals[0]) / (GraceVelintervals[GraceVelintervals.length - 1] - GraceVelintervals[0]) * 100) + '%';
+        if (i < GraceVelcolors.length - 1) {
+          GraceVelgradient += ', ';
+        }
+        // 添加数字标签
+        var label = document.createElement('div');
+        label.innerHTML = GraceVelintervals[i];
+        label.style.position = 'absolute';
+        label.style.bottom = '-25px';
+        if (GraceVelintervals[i] === 0) {
+          label.style.left = ((GraceVelintervals[i] - GraceVelintervals[0]) / (GraceVelintervals[GraceVelintervals.length - 1] - GraceVelintervals[0]) * 100) + '%';
+        } else {
+          label.style.left = (i / (GraceVelcolors.length - 1) * 100) + '%';
+        }
+        label.style.transform = 'translate(-50%, 0%)';
+        label.style.fontSize = '15px';
+        label.style.color = 'black';
+        GraceVelcolorbar.appendChild(label);
+      }
+      GraceVelgradient += ')';
+      GraceVelcolorbar.style.background = GraceVelgradient;
 
       //在地图上显示出Grace_vel图像
       map.addLayer({
@@ -72,12 +151,13 @@ export default {
             'interpolate',
             ['linear'],
             ['get', 'speed'],
-            -80, 'red',
-            10, 'white'
+            GraceVelintervals[0], GraceVelcolors[0],
+            GraceVelintervals[1], GraceVelcolors[1],
+            GraceVelintervals[2], GraceVelcolors[2]
           ]
         },
         layout: {
-          visibility: 'none', // 不可见
+          visibility: 'visible', // 可见
         },
       });
 
@@ -86,6 +166,35 @@ export default {
         type: 'geojson',
         data: './src/data/e_rate.json'
       });
+
+      var Ecolors = ['#FF01FF', '#01FFFF'];
+      var Eintervals = [-40, 500];
+      let Egradient = 'linear-gradient(to right, ';
+      var Elabel = document.createElement('div');
+      Elabel.innerHTML = 'Evapotranspiration mm/year';
+      Elabel.style.textAlign = 'center';
+      Elabel.style.fontSize = "15px"
+      var Ecolorbar = document.createElement('div');
+      Ecolorbar.style.width = '280px';
+      Ecolorbar.style.height = '18px';
+      for (let i = 0; i < Ecolors.length; i++) {
+        Egradient += Ecolors[i] + ' ' + ((Eintervals[i] - Eintervals[0]) / (Eintervals[Eintervals.length - 1] - Eintervals[0]) * 100) + '%';
+        if (i < Ecolors.length - 1) {
+          Egradient += ', ';
+        }
+        // 添加数字标签
+        var label = document.createElement('div');
+        label.innerHTML = Eintervals[i];
+        label.style.position = 'absolute';
+        label.style.bottom = '-25px';
+        label.style.left = (i / (Ecolors.length - 1) * 100) + '%';
+        label.style.transform = 'translate(-50%, 0%)';
+        label.style.fontSize = '15px';
+        label.style.color = 'black';
+        Ecolorbar.appendChild(label);
+      }
+      Egradient += ')';
+      Ecolorbar.style.background = Egradient;
 
       map.addLayer({
         id: 'E_rate',
@@ -98,8 +207,8 @@ export default {
             'interpolate',
             ['linear'],
             ['get', 'speed'],
-            -40, '#FF01FF',
-            500, '#01FFFF'
+            Eintervals[0], Ecolors[0],
+            Eintervals[1], Ecolors[1],
           ]
         },
         layout: {
@@ -113,6 +222,35 @@ export default {
         data: './src/data/r_rate.json'
       });
 
+      var Rcolors = ['#FF01FF', '#01FFFF'];
+      var Rintervals = [0, 5300];
+      let Rgradient = 'linear-gradient(to right, ';
+      var Rlabel = document.createElement('div');
+      Rlabel.innerHTML = 'Runoff mm/year';
+      Rlabel.style.textAlign = 'center';
+      Rlabel.style.fontSize = "15px"
+      var Rcolorbar = document.createElement('div');
+      Rcolorbar.style.width = '280px';
+      Rcolorbar.style.height = '18px';
+      for (let i = 0; i < Rcolors.length; i++) {
+        Rgradient += Rcolors[i] + ' ' + ((Rintervals[i] - Rintervals[0]) / (Rintervals[Rintervals.length - 1] - Rintervals[0]) * 100) + '%';
+        if (i < Rcolors.length - 1) {
+          Rgradient += ', ';
+        }
+        // 添加数字标签
+        var label = document.createElement('div');
+        label.innerHTML = Rintervals[i];
+        label.style.position = 'absolute';
+        label.style.bottom = '-25px';
+        label.style.left = (i / (Rcolors.length - 1) * 100) + '%';
+        label.style.transform = 'translate(-50%, 0%)';
+        label.style.fontSize = '15px';
+        label.style.color = 'black';
+        Rcolorbar.appendChild(label);
+      }
+      Rgradient += ')';
+      Rcolorbar.style.background = Rgradient;
+
       map.addLayer({
         id: 'R_rate',
         type: 'circle',
@@ -124,8 +262,8 @@ export default {
             'interpolate',
             ['linear'],
             ['get', 'speed'],
-            0, '#FF01FF',
-            5300, '#01FFFF'
+            Rintervals[0], Rcolors[0],
+            Rintervals[1], Rcolors[1],
           ]
         },
         layout: {
@@ -139,6 +277,35 @@ export default {
         data: './src/data/smb_rate.json'
       });
 
+      var SMBcolors = ['red', 'white', 'blue'];
+      var SMBintervals = [-40, 0, 40];
+      let SMBgradient = 'linear-gradient(to right, ';
+      var SMBlabel = document.createElement('div');
+      SMBlabel.innerHTML = 'SMB cm/year';
+      SMBlabel.style.textAlign = 'center';
+      SMBlabel.style.fontSize = "15px"
+      var SMBcolorbar = document.createElement('div');
+      SMBcolorbar.style.width = '280px';
+      SMBcolorbar.style.height = '18px';
+      for (let i = 0; i < SMBcolors.length; i++) {
+        SMBgradient += SMBcolors[i] + ' ' + ((SMBintervals[i] - SMBintervals[0]) / (SMBintervals[SMBintervals.length - 1] - SMBintervals[0]) * 100) + '%';
+        if (i < SMBcolors.length - 1) {
+          SMBgradient += ', ';
+        }
+        // 添加数字标签
+        var label = document.createElement('div');
+        label.innerHTML = SMBintervals[i];
+        label.style.position = 'absolute';
+        label.style.bottom = '-25px';
+        label.style.left = (i / (SMBcolors.length - 1) * 100) + '%';
+        label.style.transform = 'translate(-50%, 0%)';
+        label.style.fontSize = '15px';
+        label.style.color = 'black';
+        SMBcolorbar.appendChild(label);
+      }
+      SMBgradient += ')';
+      SMBcolorbar.style.background = SMBgradient;
+
       map.addLayer({
         id: 'SMB_rate',
         type: 'circle',
@@ -150,8 +317,9 @@ export default {
             'interpolate',
             ['linear'],
             ['get', 'speed'],
-            -40, '#FF01FF',
-            40, '#01FFFF'
+            SMBintervals[0], SMBcolors[0],
+            SMBintervals[1], SMBcolors[1],
+            SMBintervals[2], SMBcolors[2],
           ]
         },
         layout: {
@@ -165,6 +333,35 @@ export default {
         data: './src/data/precipitation_rate.json'
       });
 
+      var Pcolors = ['#FF01FF', '#01FFFF'];
+      var Pintervals = [40, 4000];
+      let Pgradient = 'linear-gradient(to right, ';
+      var Plabel = document.createElement('div');
+      Plabel.innerHTML = 'Precipitation mm/year';
+      Plabel.style.textAlign = 'center';
+      Plabel.style.fontSize = "15px"
+      var Pcolorbar = document.createElement('div');
+      Pcolorbar.style.width = '280px';
+      Pcolorbar.style.height = '18px';
+      for (let i = 0; i < Pcolors.length; i++) {
+        Pgradient += Pcolors[i] + ' ' + ((Pintervals[i] - Pintervals[0]) / (Pintervals[Pintervals.length - 1] - Pintervals[0]) * 100) + '%';
+        if (i < Pcolors.length - 1) {
+          Pgradient += ', ';
+        }
+        // 添加数字标签
+        var label = document.createElement('div');
+        label.innerHTML = Pintervals[i];
+        label.style.position = 'absolute';
+        label.style.bottom = '-25px';
+        label.style.left = (i / (Pcolors.length - 1) * 100) + '%';
+        label.style.transform = 'translate(-50%, 0%)';
+        label.style.fontSize = '15px';
+        label.style.color = 'black';
+        Pcolorbar.appendChild(label);
+      }
+      Pgradient += ')';
+      Pcolorbar.style.background = Pgradient;
+
       map.addLayer({
         id: 'precipitation_rate',
         type: 'circle',
@@ -176,8 +373,8 @@ export default {
             'interpolate',
             ['linear'],
             ['get', 'speed'],
-            40, '#FF01FF',
-            4000, '#01FFFF'
+            Pintervals[0], Pcolors[0],
+            Pintervals[1], Pcolors[1],
           ]
         },
         layout: {
@@ -189,6 +386,92 @@ export default {
         type: 'geojson',
         data: './src/data/gate_meta.json'
       });
+
+      // 获取地理坐标的像素坐标
+      var legendCoordinates = [-30, 68]; // 替换为您想要显示容器的地理坐标
+      var legendPixelCoordinates = map.project(legendCoordinates);
+
+      //创建容器
+      var legendsContainer = document.createElement('div');
+      legendsContainer.style.position = 'absolute';
+      legendsContainer.style.width = '280px';
+
+      // 设置容器的位置
+      legendsContainer.style.left = legendPixelCoordinates.x + 'px';
+      legendsContainer.style.top = legendPixelCoordinates.y + 'px';
+
+      mapContainer.appendChild(legendsContainer);
+
+      // 监听地图移动事件
+      map.on('move', function () {
+        // 获取地理坐标的像素坐标
+        var legendCoordinates = [-30, 68]; // 替换为您想要显示容器的地理坐标
+        var legendPixelCoordinates = map.project(legendCoordinates);
+
+        // 设置容器的位置
+        legendsContainer.style.left = legendPixelCoordinates.x + 'px';
+        legendsContainer.style.top = legendPixelCoordinates.y + 'px';
+      });
+
+      // 监听地图缩放事件
+      map.on('zoom', function () {
+        // 获取当前地图缩放级别
+        var zoom = map.getZoom();
+
+        // 根据缩放级别控制容器的可见性
+        if (zoom >= 2.5) {
+          legendsContainer.style.display = 'none'; // 当地图缩放到达特定倍数时隐藏容器
+        } else if (zoom <= 1.8) {
+          legendsContainer.style.display = 'none'; // 当地图缩放到达特定倍数时隐藏容器
+        } else {
+          legendsContainer.style.display = 'block'; // 在其他情况下显示容器
+        }
+      });
+
+      // 创建图例容器
+      var legendContainer = document.createElement('div');
+      legendContainer.style.position = 'absolute';
+      legendContainer.style.bottom = '20px';
+      legendContainer.style.right = '20px';
+      legendContainer.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+      legendContainer.style.padding = '10px';
+      legendContainer.style.borderRadius = '4px';
+      legendsContainer.appendChild(legendContainer);
+
+      // 定义不同半径值对应的图例样式
+      var legendStyles = [
+        { radius: 0, label: '0' },
+        { radius: 5, label: '5' },
+        { radius: 10, label: '10' },
+        { radius: 20, label: '20' },
+        { radius: 30, label: '30' },
+        { radius: 40, label: '40' },
+        { radius: 50, label: '50' }
+      ];
+
+      // 在图例容器中创建图例元素
+      for (var i = 0; i < legendStyles.length; i++) {
+        var legendItem = document.createElement('div');
+        var legendCircle = document.createElement('span');
+        var legendLabel = document.createElement('span');
+
+        legendItem.style.display = 'flex'; // 设置为Flex容器
+        legendItem.style.alignItems = 'center'; // 垂直居中对齐
+
+        legendCircle.style.display = 'inline-block';
+        legendCircle.style.width = legendStyles[i].radius + 'px';
+        legendCircle.style.height = legendStyles[i].radius + 'px';
+        legendCircle.style.borderRadius = '50%';
+        legendCircle.style.backgroundColor = '#33a3dc';
+        legendCircle.style.marginTop = '10px'; // 增加圆圈之间的水平间距
+
+        legendLabel.style.marginLeft = '5px';
+        legendLabel.textContent = legendStyles[i].label;
+
+        legendItem.appendChild(legendCircle);
+        legendItem.appendChild(legendLabel);
+        legendContainer.appendChild(legendItem);
+      }
 
       map.addLayer({
         id: 'gate_meta',
@@ -207,147 +490,228 @@ export default {
             40, 40,
             50, 50
           ],
-          'circle-color': 'rgba(255, 99, 71, 0.7)', // 浅红色
+          'circle-color': '#33a3dc',
         },
         layout: {
-          visibility: 'none' // 不可见
+          // visibility: 'none' // 不可见
         },
-        interactive: true,
-        clickable: true,
       });
 
-      var popup = new mapboxgl.Popup({
-        closeButton: false,
-        closeOnClick: false
-      });
+      // //显示冰川名称
+      // var popup = new mapboxgl.Popup({
+      //   closeButton: false,
+      //   closeOnClick: false
+      // });
 
-      map.on('mouseenter', 'gate_meta', function (e) {
-        var coordinates = e.features[0].geometry.coordinates.slice();
-        var glacierName = e.features[0].properties.name;
+      // map.on('mouseenter', 'gate_meta', function (e) {
+      //   var coordinates = e.features[0].geometry.coordinates.slice();
+      //   var glacierName = e.features[0].properties.name;
 
-        // 设置弹出窗口的内容和位置
-        popup.setLngLat(coordinates)
-          .setHTML(glacierName)
-          .addTo(map);
-      });
+      //   // 设置弹出窗口的内容和位置
+      //   popup.setLngLat(coordinates)
+      //     .setHTML(glacierName)
+      //     .addTo(map);
+      // });
 
-      map.on('mouseleave', 'gate_meta', function () {
-        // 鼠标离开时关闭弹出窗口
-        popup.remove();
-      });
+      // map.on('mouseleave', 'gate_meta', function () {
+      //   // 鼠标离开时关闭弹出窗口
+      //   popup.remove();
+      // });
+
+      // 创建一个变量来控制点击事件处理程序的执行
+      let isClickEventEnabled = false;
 
       map.on('click', 'gate_meta', function (e) {
+        if (isClickEventEnabled) {
 
-        // 移除之前创建的表格
-        var chartContainer = document.getElementById('chart-container');
-        if (chartContainer) {
-          chartContainer.parentNode.removeChild(chartContainer);
+          // 移除之前创建的表格
+          var glacierChartContainer = document.getElementById('glacierChart-container');
+          if (glacierChartContainer) {
+            glacierChartContainer.parentNode.removeChild(glacierChartContainer);
+          }
+
+          var glacierDischargeContainer = document.createElement('div');
+          glacierDischargeContainer.id = 'glacierChart-container';
+          glacierDischargeContainer.style.position = 'relative';
+          glacierDischargeContainer.style.left = '0px';
+          glacierDischargeContainer.style.top = '0px';
+
+          mapContainer.appendChild(glacierDischargeContainer);
+
+          // 创建新的表格
+          var data = JSON.parse(e.features[0].properties.speeds);
+          // var glacierTitle = e.features[0].properties.name;
+          var glacierChartContainer = document.createElement('div');
+          glacierChartContainer.setAttribute('id', 'dischargeChart');
+          glacierChartContainer.style.width = '628px';
+          glacierChartContainer.style.height = '400px';
+          glacierChartContainer.style.left = '0px';
+          glacierChartContainer.style.position = 'absolute';
+          glacierChartContainer.style.backgroundColor = 'white';
+          glacierChartContainer.style.zIndex = 999;
+          glacierDischargeContainer.appendChild(glacierChartContainer);
+          var myChart = echarts.init(glacierChartContainer);
+
+          myChart.setOption({
+            // title: {
+            //   text: glacierTitle,   // 设置标题文本
+            //   textStyle: {              // 标题文字样式配置
+            //     color: 'black',
+            //     fontSize: 15,
+            //   },
+            //   left: 'center',   // 设置标题水平居中
+            // },
+            tooltip: {
+              trigger: "item",
+            },
+            xAxis: {
+              type: 'time',
+              data: data.map(item => item.time),
+              min: '1986', // 设置 X 轴的最小值
+              max: '2023', // 设置 X 轴的最大值
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            yAxis: {
+              type: 'value',
+              name: 'Discharge (Gt/yr)',
+              nameLocation: "middle",
+              nameTextStyle: {
+                fontSize: 15,
+              },
+              nameGap: 40,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            grid: {
+              width: '80%',  // 设置宽度为80%
+              height: '70%',  // 设置高度为80%
+              left: '10%',
+              top: '15%',
+            },
+            series: [
+              {
+                type: 'scatter',
+                name: 'discharge',
+                data: data.map(item => [item.time, item.discharge]),
+                color: 'red',
+                tooltip: {
+                  trigger: 'item',
+                  formatter: function (params) {
+                    const year = params.value[0];
+                    const discharge = params.value[1].toFixed(3);
+                    return "time:" + year + "<br />" + "discharge: " + discharge;
+                  }
+                }
+              }
+            ],
+            toolbox: {
+              feature: {
+                saveAsImage: {},
+              },
+              itemSize: 18,
+              itemGap: 20,
+              right: 70,
+            },
+          });
+
+          // 创建一个按钮元素
+          var closeButton = document.createElement('button');
+          closeButton.innerHTML = '关闭';
+          closeButton.id = 'glacier-close-button';
+          closeButton.style.position = 'absolute';
+          closeButton.style.left = '580px';
+          closeButton.style.top = '5px';
+          closeButton.style.zIndex = 999;
+          // 将按钮添加到地图容器中
+          glacierDischargeContainer.appendChild(closeButton);
+          // 添加点击事件监听器
+          closeButton.addEventListener('click', function () {
+            document.getElementById('glacierChart-container').style.display = 'none';
+          });
+
+          var downloadButton = document.createElement('button');
+          downloadButton.innerHTML = '下载数据';
+          downloadButton.id = 'download-button';
+          downloadButton.style.position = 'absolute';
+          downloadButton.style.left = '440px';
+          downloadButton.style.top = '5px';
+          downloadButton.style.zIndex = 999;
+
+          // 将按钮添加到地图容器中
+          glacierDischargeContainer.appendChild(downloadButton);
+          // 添加点击事件监听器
+          downloadButton.addEventListener('click', function () {
+            // 创建要下载的文件内容
+            const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+
+            // 创建临时链接
+            const blob = new Blob([fileContent], { type: 'application/json' });
+            const blobURL = URL.createObjectURL(blob);
+
+            // 创建下载链接
+            const downloadLink = document.createElement('a');
+            downloadLink.href = blobURL;
+            downloadLink.download = 'gate_meta.json';
+            downloadLink.style.display = 'none';
+
+            // 将下载链接添加到 DOM 中
+            document.body.appendChild(downloadLink);
+
+            // 模拟点击下载链接
+            downloadLink.click();
+
+            // 清理临时链接
+            URL.revokeObjectURL(blobURL);
+
+            // 从 DOM 中移除下载链接
+            document.body.removeChild(downloadLink);
+          });
+
+          glacierDischargeContainer.addEventListener('mousedown', startDrag);
+          function startDrag(e) {
+            e.preventDefault();
+
+            var initialX = e.clientX;
+            var initialY = e.clientY;
+            var startX = parseInt(glacierDischargeContainer.style.left) || 0;
+            var startY = parseInt(glacierDischargeContainer.style.top) || 0;
+
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleUp);
+
+            function handleMove(e) {
+              var offsetX = e.clientX - initialX;
+              var offsetY = e.clientY - initialY;
+
+              glacierDischargeContainer.style.left = startX + offsetX + 'px';
+              glacierDischargeContainer.style.top = startY + offsetY + 'px';
+            }
+
+            function handleUp() {
+              document.removeEventListener('mousemove', handleMove);
+              document.removeEventListener('mouseup', handleUp);
+            }
+          }
         }
-
-        var container = document.createElement('div');
-        container.id = 'chart-container';
-        document.body.appendChild(container);
-
-        // 创建新的表格
-        var data = JSON.parse(e.features[0].properties.speeds);
-        var glacierTitle = e.features[0].properties.name;
-        var chartContainer = document.createElement('div');
-        chartContainer.setAttribute('id', 'chart');
-        chartContainer.style.width = '628px';
-        chartContainer.style.height = '400px';
-        chartContainer.style.left = '0px';
-        chartContainer.style.position = 'absolute';
-        chartContainer.style.backgroundColor = 'white';
-        chartContainer.style.zIndex = 999;
-        container.appendChild(chartContainer);
-        var myChart = echarts.init(chartContainer);
-
-        myChart.setOption({
-          title: {
-            text: glacierTitle,   // 设置标题文本
-            textStyle: {              // 标题文字样式配置
-              color: 'black',
-              fontSize: 15,
-            },
-            left: 'center',   // 设置标题水平居中
-          },
-          tooltip: {
-            trigger: "item",
-          },
-          xAxis: {
-            type: 'category',
-            data: data.map(item => item.time),
-            axisLabel: {
-              fontFamily: 'Arial', // 设置字体
-              fontSize: 15,        // 设置字号
-              color: '#333'        // 设置颜色
-            },
-            axisLine: {
-              show: false,
-            },
-            axisTick: {
-              show: false,
-            }
-          },
-          yAxis: {
-            type: 'value',
-            name: 'Discharge (Gt/yr)',
-            nameLocation: "middle",
-            nameTextStyle: {
-              fontSize: 15,
-            },
-            nameGap: 40,
-            axisLabel: {
-              fontFamily: 'Arial', // 设置字体
-              fontSize: 15,        // 设置字号
-              color: '#333'        // 设置颜色
-            },
-            axisLine: {
-              show: false,
-            },
-            axisTick: {
-              show: false,
-            }
-          },
-          grid: {
-            width: '80%',  // 设置宽度为80%
-            height: '70%',  // 设置高度为80%
-            left: '10%',
-            top: '15%',
-          },
-          series: [
-            {
-              type: 'scatter',
-              name: 'time              discharge',
-              data: data.map(item => [item.time, item.discharge]),
-              color: 'red',
-            },
-          ],
-          toolbox: {
-            feature: {
-              dataView: { readOnly: false },
-              saveAsImage: {},
-            },
-            itemSize: 18,
-            itemGap: 20,
-            right: 70,
-          },
-        });
-
-        // 创建一个按钮元素
-        var closeButton = document.createElement('button');
-        closeButton.innerHTML = '关闭';
-        closeButton.id = 'close-button';
-        closeButton.style.position = 'absolute';
-        closeButton.style.left = '580px';
-        closeButton.style.top = '5px';
-        closeButton.style.zIndex = 999;
-        // 将按钮添加到地图容器中
-        container.appendChild(closeButton);
-        // 添加点击事件监听器
-        closeButton.addEventListener('click', function () {
-          document.getElementById('chart-container').style.display = 'none';
-        });
       });
 
       //为各个流域添加边界线
@@ -369,7 +733,7 @@ export default {
         layout: {
           'text-field': 'CW', // 名称
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-          'text-size': 20
+          'text-size': 20,
         },
         minzoom: 1, // 只在缩放级别大于等于1时显示
         maxzoom: 3.5  // 缩放级别小于3显示
@@ -387,22 +751,262 @@ export default {
         interactive: true,
         clickable: true,
         layout: {
-          visibility: 'none' // 不可见
         }
       });
 
-      // var url = 'https://3707n923f3.goho.co';
       var url = 'http://localhost:7070';
+
+      var cwFlag = true;
+      var neFlag = true;
+      var noFlag = true;
+      var nwFlag = true;
+      var seFlag = true;
+      var swFlag = true;
 
       //点击各个区域时显示出Mass Change的图表
       map.on('click', 'greenlandCw-fill', function (e) {
-        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
-        map.setLayoutProperty('E_rate', 'visibility', 'none');
-        map.setLayoutProperty('R_rate', 'visibility', 'none');
-        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
-        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
-        map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = url + '/#/cw'
+        if (cwFlag) {
+          map.setLayoutProperty('Grace_Vel', 'visibility', 'visible');
+          map.setLayoutProperty('E_rate', 'visibility', 'none');
+          map.setLayoutProperty('R_rate', 'visibility', 'none');
+          map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+          map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
+          map.setLayoutProperty('gate_meta', 'visibility', 'visible');
+          isClickEventEnabled = false;
+          window.location.href = url + '/#/cw'
+        } else if (isClickEventEnabled) {
+          // 移除之前创建的表格
+          var chartContainer = document.getElementById('chart-container');
+          if (chartContainer) {
+            chartContainer.parentNode.removeChild(chartContainer);
+          }
+
+          var dischargeContainer = document.createElement('div');
+          dischargeContainer.id = 'chart-container';
+          dischargeContainer.style.position = 'relative';
+          dischargeContainer.style.left = '0px';
+          dischargeContainer.style.top = '0px';
+
+
+          mapContainer.appendChild(dischargeContainer);
+
+          // 获取边界线图层的边界经纬度坐标
+          var boundaryFeatures = map.querySourceFeatures('greenlandCw');
+
+          // 获取圆圈图层的所有圆圈要素
+          var circleFeatures = map.querySourceFeatures('gate_meta');
+
+          // 创建一个空数组用于存储合并后的结果
+          var mergedArray = [];
+
+          // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
+          circleFeatures.forEach(function (circle) {
+            var circleCenter = circle.geometry.coordinates;
+
+            // 检查中心点是否位于边界线图层的边界内
+            if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
+              var data = JSON.parse(circle.properties.speeds);
+              mergedArray.push(data);
+            }
+          });
+
+          const mergedResult = mergedArray.reduce((result, array) => {
+            array.forEach((item) => {
+              const existingItem = result.find((r) => r.time === item.time);
+              if (existingItem) {
+                existingItem.discharge += item.discharge;
+              } else {
+                result.push({ time: item.time, discharge: item.discharge });
+              }
+            });
+            return result;
+          }, []);
+
+          // 判断一个点是否位于边界线图层的边界内
+          function isPointWithinBoundary(point, boundaryFeatures) {
+            var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
+              return feature.geometry.coordinates;
+            }));
+            var pointOnLine = turf.point(point);
+            return turf.booleanPointInPolygon(pointOnLine, polygon);
+          }
+
+          var data = mergedResult;
+          var chartContainer = document.createElement('div');
+          chartContainer.setAttribute('id', 'totalChart');
+          chartContainer.style.width = '628px';
+          chartContainer.style.height = '400px';
+          chartContainer.style.left = '0px';
+          chartContainer.style.position = 'absolute';
+          chartContainer.style.backgroundColor = 'white';
+          chartContainer.style.zIndex = 999;
+          dischargeContainer.appendChild(chartContainer);
+          var myChart = echarts.init(chartContainer);
+
+          myChart.setOption({
+            title: {
+              text: 'CW',   // 设置标题文本
+              textStyle: {              // 标题文字样式配置
+                color: 'black',
+                fontSize: 15,
+              },
+              left: 'center',   // 设置标题水平居中
+              top: '10px',
+            },
+            tooltip: {
+              trigger: "item",
+            },
+            xAxis: {
+              type: 'time',
+              data: data.map(item => item.time),
+              min: '1986', // 设置 X 轴的最小值
+              max: '2023', // 设置 X 轴的最大值
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            yAxis: {
+              type: 'value',
+              name: 'Discharge (Gt/yr)',
+              nameLocation: "middle",
+              nameTextStyle: {
+                fontSize: 15,
+              },
+              nameGap: 40,
+              axisLabel: {
+                fontFamily: 'Arial', // 设置字体
+                fontSize: 15,        // 设置字号
+                color: '#333'        // 设置颜色
+              },
+              axisLine: {
+                show: false,
+              },
+              axisTick: {
+                show: false,
+              }
+            },
+            grid: {
+              width: '80%',  // 设置宽度为80%
+              height: '70%',  // 设置高度为80%
+              left: '10%',
+              top: '15%',
+            },
+            series: [
+              {
+                type: 'scatter',
+                name: 'discharge',
+                data: data.map(item => [item.time, item.discharge]),
+                color: 'red',
+                tooltip: {
+                  trigger: 'item',
+                  formatter: function (params) {
+                    const year = params.value[0];
+                    const discharge = params.value[1].toFixed(3);
+                    return "time:" + year + "<br />" + "discharge: " + discharge;
+                  }
+                }
+              }
+            ],
+            toolbox: {
+              feature: {
+                saveAsImage: {},
+              },
+              itemSize: 18,
+              itemGap: 20,
+              right: 70,
+            },
+          });
+
+          // 创建一个按钮元素
+          var closeButton = document.createElement('button');
+          closeButton.innerHTML = '关闭';
+          closeButton.id = 'close-button';
+          closeButton.style.position = 'absolute';
+          closeButton.style.left = '580px';
+          closeButton.style.top = '5px';
+          closeButton.style.zIndex = 999;
+          // 将按钮添加到地图容器中
+          dischargeContainer.appendChild(closeButton);
+          // 添加点击事件监听器
+          closeButton.addEventListener('click', function () {
+            document.getElementById('chart-container').style.display = 'none';
+          });
+
+          var downloadButton = document.createElement('button');
+          downloadButton.innerHTML = '下载数据';
+          downloadButton.id = 'download-button';
+          downloadButton.style.position = 'absolute';
+          downloadButton.style.left = '440px';
+          downloadButton.style.top = '5px';
+          downloadButton.style.zIndex = 999;
+
+          // 将按钮添加到地图容器中
+          dischargeContainer.appendChild(downloadButton);
+          // 添加点击事件监听器
+          downloadButton.addEventListener('click', function () {
+            // 创建要下载的文件内容
+            const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+
+            // 创建临时链接
+            const blob = new Blob([fileContent], { type: 'application/json' });
+            const blobURL = URL.createObjectURL(blob);
+
+            // 创建下载链接
+            const downloadLink = document.createElement('a');
+            downloadLink.href = blobURL;
+            downloadLink.download = 'gate_meta.json';
+            downloadLink.style.display = 'none';
+
+            // 将下载链接添加到 DOM 中
+            document.body.appendChild(downloadLink);
+
+            // 模拟点击下载链接
+            downloadLink.click();
+
+            // 清理临时链接
+            URL.revokeObjectURL(blobURL);
+
+            // 从 DOM 中移除下载链接
+            document.body.removeChild(downloadLink);
+          });
+
+          dischargeContainer.addEventListener('mousedown', startDrag);
+          function startDrag(e) {
+            e.preventDefault();
+
+            var initialX = e.clientX;
+            var initialY = e.clientY;
+            var startX = parseInt(dischargeContainer.style.left) || 0;
+            var startY = parseInt(dischargeContainer.style.top) || 0;
+
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleUp);
+
+            function handleMove(e) {
+              var offsetX = e.clientX - initialX;
+              var offsetY = e.clientY - initialY;
+
+              dischargeContainer.style.left = startX + offsetX + 'px';
+              dischargeContainer.style.top = startY + offsetY + 'px';
+            }
+
+            function handleUp() {
+              document.removeEventListener('mousemove', handleMove);
+              document.removeEventListener('mouseup', handleUp);
+            }
+          }
+          if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
+            document.getElementById('chart-container').style.display = 'none';
+          }
+        }
       });
 
       map.addLayer({
@@ -439,18 +1043,252 @@ export default {
         interactive: true,
         clickable: true,
         layout: {
-          visibility: 'none' // 不可见
         }
       });
 
+      //点击各个区域时显示出Mass Change的图表
       map.on('click', 'greenlandNe-fill', function (e) {
-        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
-        map.setLayoutProperty('E_rate', 'visibility', 'none');
-        map.setLayoutProperty('R_rate', 'visibility', 'none');
-        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
-        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
-        map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = url + '/#/ne';
+        if (neFlag) {
+          map.setLayoutProperty('Grace_Vel', 'visibility', 'visible');
+          map.setLayoutProperty('E_rate', 'visibility', 'none');
+          map.setLayoutProperty('R_rate', 'visibility', 'none');
+          map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+          map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
+          map.setLayoutProperty('gate_meta', 'visibility', 'visible');
+          isClickEventEnabled = false;
+          window.location.href = url + '/#/ne'
+        } else {
+          if (isClickEventEnabled) {
+            // 移除之前创建的表格
+            var chartContainer = document.getElementById('chart-container');
+            if (chartContainer) {
+              chartContainer.parentNode.removeChild(chartContainer);
+            }
+            var dischargeContainer = document.createElement('div');
+            dischargeContainer.id = 'chart-container';
+            dischargeContainer.style.position = 'relative';
+            dischargeContainer.style.left = '0px';
+            dischargeContainer.style.top = '0px';
+
+            mapContainer.appendChild(dischargeContainer);
+
+            // 获取边界线图层的边界经纬度坐标
+            var boundaryFeatures = map.querySourceFeatures('greenlandNe');
+
+            // 获取圆圈图层的所有圆圈要素
+            var circleFeatures = map.querySourceFeatures('gate_meta');
+
+            // 创建一个空数组用于存储合并后的结果
+            var mergedArray = [];
+
+            // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
+            circleFeatures.forEach(function (circle) {
+              var circleCenter = circle.geometry.coordinates;
+
+              // 检查中心点是否位于边界线图层的边界内
+              if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
+                var data = JSON.parse(circle.properties.speeds);
+                mergedArray.push(data);
+              }
+            });
+
+            const mergedResult = mergedArray.reduce((result, array) => {
+              array.forEach((item) => {
+                const existingItem = result.find((r) => r.time === item.time);
+                if (existingItem) {
+                  existingItem.discharge += item.discharge;
+                } else {
+                  result.push({ time: item.time, discharge: item.discharge });
+                }
+              });
+              return result;
+            }, []);
+
+            // 判断一个点是否位于边界线图层的边界内
+            function isPointWithinBoundary(point, boundaryFeatures) {
+              var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
+                return feature.geometry.coordinates;
+              }));
+              var pointOnLine = turf.point(point);
+              return turf.booleanPointInPolygon(pointOnLine, polygon);
+            }
+
+            var data = mergedResult;
+            var chartContainer = document.createElement('div');
+            chartContainer.setAttribute('id', 'totalChart');
+            chartContainer.style.width = '628px';
+            chartContainer.style.height = '400px';
+            chartContainer.style.left = '0px';
+            chartContainer.style.position = 'absolute';
+            chartContainer.style.backgroundColor = 'white';
+            chartContainer.style.zIndex = 999;
+            dischargeContainer.appendChild(chartContainer);
+            var myChart = echarts.init(chartContainer);
+
+            myChart.setOption({
+              title: {
+                text: 'NE',   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px',
+              },
+              tooltip: {
+                trigger: "item",
+              },
+              xAxis: {
+                type: 'time',
+                data: data.map(item => item.time),
+                min: '1986', // 设置 X 轴的最小值
+                max: '2023', // 设置 X 轴的最大值
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: 'Discharge (Gt/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: 'scatter',
+                  name: 'discharge',
+                  data: data.map(item => [item.time, item.discharge]),
+                  color: 'red',
+                  tooltip: {
+                    trigger: 'item',
+                    formatter: function (params) {
+                      const year = params.value[0];
+                      const discharge = params.value[1].toFixed(3);
+                      return "time:" + year + "<br />" + "discharge: " + discharge;
+                    }
+                  }
+                }
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = 'close-button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            dischargeContainer.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              document.getElementById('chart-container').style.display = 'none';
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            dischargeContainer.appendChild(downloadButton);
+            // 添加点击事件监听器
+            downloadButton.addEventListener('click', function () {
+              // 创建要下载的文件内容
+              const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+
+              // 创建临时链接
+              const blob = new Blob([fileContent], { type: 'application/json' });
+              const blobURL = URL.createObjectURL(blob);
+
+              // 创建下载链接
+              const downloadLink = document.createElement('a');
+              downloadLink.href = blobURL;
+              downloadLink.download = 'gate_meta.json';
+              downloadLink.style.display = 'none';
+
+              // 将下载链接添加到 DOM 中
+              document.body.appendChild(downloadLink);
+
+              // 模拟点击下载链接
+              downloadLink.click();
+
+              // 清理临时链接
+              URL.revokeObjectURL(blobURL);
+
+              // 从 DOM 中移除下载链接
+              document.body.removeChild(downloadLink);
+            });
+            dischargeContainer.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(dischargeContainer.style.left) || 0;
+              var startY = parseInt(dischargeContainer.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                dischargeContainer.style.left = startX + offsetX + 'px';
+                dischargeContainer.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+            if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
+              document.getElementById('chart-container').style.display = 'none';
+            }
+          }
+        }
       });
 
       map.addLayer({
@@ -463,6 +1301,7 @@ export default {
         },
       });
 
+      // 添加各个流域名称
       map.addLayer({
         id: 'greenlandNo-marker',
         type: 'symbol',
@@ -470,7 +1309,9 @@ export default {
         layout: {
           'text-field': 'NO', // 名称
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-          'text-size': 20
+          'text-size': 20,
+          'text-anchor': 'center',
+          'text-offset': [-3, 4.5]
         },
         minzoom: 1, // 只在缩放级别大于等于1时显示
         maxzoom: 3.5  // 缩放级别小于3显示
@@ -487,18 +1328,252 @@ export default {
         interactive: true,
         clickable: true,
         layout: {
-          visibility: 'none' // 不可见
         }
       });
 
+      //点击各个区域时显示出Mass Change的图表
       map.on('click', 'greenlandNo-fill', function (e) {
-        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
-        map.setLayoutProperty('E_rate', 'visibility', 'none');
-        map.setLayoutProperty('R_rate', 'visibility', 'none');
-        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
-        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
-        map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = url + '/#/no'
+        if (noFlag) {
+          map.setLayoutProperty('Grace_Vel', 'visibility', 'visible');
+          map.setLayoutProperty('E_rate', 'visibility', 'none');
+          map.setLayoutProperty('R_rate', 'visibility', 'none');
+          map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+          map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
+          map.setLayoutProperty('gate_meta', 'visibility', 'visible');
+          isClickEventEnabled = false;
+          window.location.href = url + '/#/no'
+        } else {
+          if (isClickEventEnabled) {
+            // 移除之前创建的表格
+            var chartContainer = document.getElementById('chart-container');
+            if (chartContainer) {
+              chartContainer.parentNode.removeChild(chartContainer);
+            }
+            var dischargeContainer = document.createElement('div');
+            dischargeContainer.id = 'chart-container';
+            dischargeContainer.style.position = 'relative';
+            dischargeContainer.style.left = '0px';
+            dischargeContainer.style.top = '0px';
+
+            mapContainer.appendChild(dischargeContainer);
+
+            // 获取边界线图层的边界经纬度坐标
+            var boundaryFeatures = map.querySourceFeatures('greenlandNo');
+
+            // 获取圆圈图层的所有圆圈要素
+            var circleFeatures = map.querySourceFeatures('gate_meta');
+
+            // 创建一个空数组用于存储合并后的结果
+            var mergedArray = [];
+
+            // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
+            circleFeatures.forEach(function (circle) {
+              var circleCenter = circle.geometry.coordinates;
+
+              // 检查中心点是否位于边界线图层的边界内
+              if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
+                var data = JSON.parse(circle.properties.speeds);
+                mergedArray.push(data);
+              }
+            });
+
+            const mergedResult = mergedArray.reduce((result, array) => {
+              array.forEach((item) => {
+                const existingItem = result.find((r) => r.time === item.time);
+                if (existingItem) {
+                  existingItem.discharge += item.discharge;
+                } else {
+                  result.push({ time: item.time, discharge: item.discharge });
+                }
+              });
+              return result;
+            }, []);
+
+            // 判断一个点是否位于边界线图层的边界内
+            function isPointWithinBoundary(point, boundaryFeatures) {
+              var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
+                return feature.geometry.coordinates;
+              }));
+              var pointOnLine = turf.point(point);
+              return turf.booleanPointInPolygon(pointOnLine, polygon);
+            }
+
+            var data = mergedResult;
+            var chartContainer = document.createElement('div');
+            chartContainer.setAttribute('id', 'totalChart');
+            chartContainer.style.width = '628px';
+            chartContainer.style.height = '400px';
+            chartContainer.style.left = '0px';
+            chartContainer.style.position = 'absolute';
+            chartContainer.style.backgroundColor = 'white';
+            chartContainer.style.zIndex = 999;
+            dischargeContainer.appendChild(chartContainer);
+            var myChart = echarts.init(chartContainer);
+
+            myChart.setOption({
+              title: {
+                text: 'NO',   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px',
+              },
+              tooltip: {
+                trigger: "item",
+              },
+              xAxis: {
+                type: 'time',
+                data: data.map(item => item.time),
+                min: '1986', // 设置 X 轴的最小值
+                max: '2023', // 设置 X 轴的最大值
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: 'Discharge (Gt/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: 'scatter',
+                  name: 'discharge',
+                  data: data.map(item => [item.time, item.discharge]),
+                  color: 'red',
+                  tooltip: {
+                    trigger: 'item',
+                    formatter: function (params) {
+                      const year = params.value[0];
+                      const discharge = params.value[1].toFixed(3);
+                      return "time:" + year + "<br />" + "discharge: " + discharge;
+                    }
+                  }
+                }
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = 'close-button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            dischargeContainer.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              document.getElementById('chart-container').style.display = 'none';
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            dischargeContainer.appendChild(downloadButton);
+            // 添加点击事件监听器
+            downloadButton.addEventListener('click', function () {
+              // 创建要下载的文件内容
+              const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+
+              // 创建临时链接
+              const blob = new Blob([fileContent], { type: 'application/json' });
+              const blobURL = URL.createObjectURL(blob);
+
+              // 创建下载链接
+              const downloadLink = document.createElement('a');
+              downloadLink.href = blobURL;
+              downloadLink.download = 'gate_meta.json';
+              downloadLink.style.display = 'none';
+
+              // 将下载链接添加到 DOM 中
+              document.body.appendChild(downloadLink);
+
+              // 模拟点击下载链接
+              downloadLink.click();
+
+              // 清理临时链接
+              URL.revokeObjectURL(blobURL);
+
+              // 从 DOM 中移除下载链接
+              document.body.removeChild(downloadLink);
+            });
+            dischargeContainer.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(dischargeContainer.style.left) || 0;
+              var startY = parseInt(dischargeContainer.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                dischargeContainer.style.left = startX + offsetX + 'px';
+                dischargeContainer.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+            if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
+              document.getElementById('chart-container').style.display = 'none';
+            }
+          }
+        }
       });
 
       map.addLayer({
@@ -535,18 +1610,253 @@ export default {
         interactive: true,
         clickable: true,
         layout: {
-          visibility: 'none' // 不可见
         }
       });
 
+      //点击各个区域时显示出Mass Change的图表
       map.on('click', 'greenlandNw-fill', function (e) {
-        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
-        map.setLayoutProperty('E_rate', 'visibility', 'none');
-        map.setLayoutProperty('R_rate', 'visibility', 'none');
-        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
-        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
-        map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = url + '/#/nw'
+        if (nwFlag) {
+          map.setLayoutProperty('Grace_Vel', 'visibility', 'visible');
+          map.setLayoutProperty('E_rate', 'visibility', 'none');
+          map.setLayoutProperty('R_rate', 'visibility', 'none');
+          map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+          map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
+          map.setLayoutProperty('gate_meta', 'visibility', 'visible');
+          isClickEventEnabled = false;
+          window.location.href = url + '/#/nw'
+        } else {
+          if (isClickEventEnabled) {
+            // 移除之前创建的表格
+            var chartContainer = document.getElementById('chart-container');
+            if (chartContainer) {
+              chartContainer.parentNode.removeChild(chartContainer);
+            }
+
+            var dischargeContainer = document.createElement('div');
+            dischargeContainer.id = 'chart-container';
+            dischargeContainer.style.position = 'relative';
+            dischargeContainer.style.left = '0px';
+            dischargeContainer.style.top = '0px';
+
+            mapContainer.appendChild(dischargeContainer);
+
+            // 获取边界线图层的边界经纬度坐标
+            var boundaryFeatures = map.querySourceFeatures('greenlandNw');
+
+            // 获取圆圈图层的所有圆圈要素
+            var circleFeatures = map.querySourceFeatures('gate_meta');
+
+            // 创建一个空数组用于存储合并后的结果
+            var mergedArray = [];
+
+            // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
+            circleFeatures.forEach(function (circle) {
+              var circleCenter = circle.geometry.coordinates;
+
+              // 检查中心点是否位于边界线图层的边界内
+              if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
+                var data = JSON.parse(circle.properties.speeds);
+                mergedArray.push(data);
+              }
+            });
+
+            const mergedResult = mergedArray.reduce((result, array) => {
+              array.forEach((item) => {
+                const existingItem = result.find((r) => r.time === item.time);
+                if (existingItem) {
+                  existingItem.discharge += item.discharge;
+                } else {
+                  result.push({ time: item.time, discharge: item.discharge });
+                }
+              });
+              return result;
+            }, []);
+
+            // 判断一个点是否位于边界线图层的边界内
+            function isPointWithinBoundary(point, boundaryFeatures) {
+              var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
+                return feature.geometry.coordinates;
+              }));
+              var pointOnLine = turf.point(point);
+              return turf.booleanPointInPolygon(pointOnLine, polygon);
+            }
+
+            var data = mergedResult;
+            var chartContainer = document.createElement('div');
+            chartContainer.setAttribute('id', 'totalChart');
+            chartContainer.style.width = '628px';
+            chartContainer.style.height = '400px';
+            chartContainer.style.left = '0px';
+            chartContainer.style.position = 'absolute';
+            chartContainer.style.backgroundColor = 'white';
+            chartContainer.style.zIndex = 999;
+            dischargeContainer.appendChild(chartContainer);
+            var myChart = echarts.init(chartContainer);
+
+            myChart.setOption({
+              title: {
+                text: 'NW',   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px',
+              },
+              tooltip: {
+                trigger: "item",
+              },
+              xAxis: {
+                type: 'time',
+                data: data.map(item => item.time),
+                min: '1986', // 设置 X 轴的最小值
+                max: '2023', // 设置 X 轴的最大值
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: 'Discharge (Gt/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: 'scatter',
+                  name: 'discharge',
+                  data: data.map(item => [item.time, item.discharge]),
+                  color: 'red',
+                  tooltip: {
+                    trigger: 'item',
+                    formatter: function (params) {
+                      const year = params.value[0];
+                      const discharge = params.value[1].toFixed(3);
+                      return "time:" + year + "<br />" + "discharge: " + discharge;
+                    }
+                  }
+                }
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = 'close-button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            dischargeContainer.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              document.getElementById('chart-container').style.display = 'none';
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            dischargeContainer.appendChild(downloadButton);
+            // 添加点击事件监听器
+            downloadButton.addEventListener('click', function () {
+              // 创建要下载的文件内容
+              const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+
+              // 创建临时链接
+              const blob = new Blob([fileContent], { type: 'application/json' });
+              const blobURL = URL.createObjectURL(blob);
+
+              // 创建下载链接
+              const downloadLink = document.createElement('a');
+              downloadLink.href = blobURL;
+              downloadLink.download = 'gate_meta.json';
+              downloadLink.style.display = 'none';
+
+              // 将下载链接添加到 DOM 中
+              document.body.appendChild(downloadLink);
+
+              // 模拟点击下载链接
+              downloadLink.click();
+
+              // 清理临时链接
+              URL.revokeObjectURL(blobURL);
+
+              // 从 DOM 中移除下载链接
+              document.body.removeChild(downloadLink);
+            });
+            dischargeContainer.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(dischargeContainer.style.left) || 0;
+              var startY = parseInt(dischargeContainer.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                dischargeContainer.style.left = startX + offsetX + 'px';
+                dischargeContainer.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+            if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
+              document.getElementById('chart-container').style.display = 'none';
+            }
+          }
+        }
       });
 
       map.addLayer({
@@ -566,7 +1876,9 @@ export default {
         layout: {
           'text-field': 'SE', // 名称
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-          'text-size': 20
+          'text-size': 20,
+          'text-anchor': 'center',
+          'text-offset': [0, -0.5]
         },
         minzoom: 1, // 只在缩放级别大于等于1时显示
         maxzoom: 3.5  // 缩放级别小于3显示
@@ -583,18 +1895,252 @@ export default {
         interactive: true,
         clickable: true,
         layout: {
-          visibility: 'none' // 不可见
         }
       });
 
+      //点击各个区域时显示出Mass Change的图表
       map.on('click', 'greenlandSe-fill', function (e) {
-        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
-        map.setLayoutProperty('E_rate', 'visibility', 'none');
-        map.setLayoutProperty('R_rate', 'visibility', 'none');
-        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
-        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
-        map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = url + '/#/se'
+        if (seFlag) {
+          map.setLayoutProperty('Grace_Vel', 'visibility', 'visible');
+          map.setLayoutProperty('E_rate', 'visibility', 'none');
+          map.setLayoutProperty('R_rate', 'visibility', 'none');
+          map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+          map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
+          map.setLayoutProperty('gate_meta', 'visibility', 'visible');
+          isClickEventEnabled = false;
+          window.location.href = url + '/#/se'
+        } else {
+          if (isClickEventEnabled) {
+            // 移除之前创建的表格
+            var chartContainer = document.getElementById('chart-container');
+            if (chartContainer) {
+              chartContainer.parentNode.removeChild(chartContainer);
+            }
+            var dischargeContainer = document.createElement('div');
+            dischargeContainer.id = 'chart-container';
+            dischargeContainer.style.position = 'relative';
+            dischargeContainer.style.left = '0px';
+            dischargeContainer.style.top = '0px';
+
+            mapContainer.appendChild(dischargeContainer);
+
+            // 获取边界线图层的边界经纬度坐标
+            var boundaryFeatures = map.querySourceFeatures('greenlandSe');
+
+            // 获取圆圈图层的所有圆圈要素
+            var circleFeatures = map.querySourceFeatures('gate_meta');
+
+            // 创建一个空数组用于存储合并后的结果
+            var mergedArray = [];
+
+            // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
+            circleFeatures.forEach(function (circle) {
+              var circleCenter = circle.geometry.coordinates;
+
+              // 检查中心点是否位于边界线图层的边界内
+              if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
+                var data = JSON.parse(circle.properties.speeds);
+                mergedArray.push(data);
+              }
+            });
+
+            const mergedResult = mergedArray.reduce((result, array) => {
+              array.forEach((item) => {
+                const existingItem = result.find((r) => r.time === item.time);
+                if (existingItem) {
+                  existingItem.discharge += item.discharge;
+                } else {
+                  result.push({ time: item.time, discharge: item.discharge });
+                }
+              });
+              return result;
+            }, []);
+
+            // 判断一个点是否位于边界线图层的边界内
+            function isPointWithinBoundary(point, boundaryFeatures) {
+              var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
+                return feature.geometry.coordinates;
+              }));
+              var pointOnLine = turf.point(point);
+              return turf.booleanPointInPolygon(pointOnLine, polygon);
+            }
+
+            var data = mergedResult;
+            var chartContainer = document.createElement('div');
+            chartContainer.setAttribute('id', 'totalChart');
+            chartContainer.style.width = '628px';
+            chartContainer.style.height = '400px';
+            chartContainer.style.left = '0px';
+            chartContainer.style.position = 'absolute';
+            chartContainer.style.backgroundColor = 'white';
+            chartContainer.style.zIndex = 999;
+            dischargeContainer.appendChild(chartContainer);
+            var myChart = echarts.init(chartContainer);
+
+            myChart.setOption({
+              title: {
+                text: 'SE',   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px',
+              },
+              tooltip: {
+                trigger: "item",
+              },
+              xAxis: {
+                type: 'time',
+                data: data.map(item => item.time),
+                min: '1986', // 设置 X 轴的最小值
+                max: '2023', // 设置 X 轴的最大值
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: 'Discharge (Gt/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: 'scatter',
+                  name: 'discharge',
+                  data: data.map(item => [item.time, item.discharge]),
+                  color: 'red',
+                  tooltip: {
+                    trigger: 'item',
+                    formatter: function (params) {
+                      const year = params.value[0];
+                      const discharge = params.value[1].toFixed(3);
+                      return "time:" + year + "<br />" + "discharge: " + discharge;
+                    }
+                  }
+                }
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = 'close-button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            dischargeContainer.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              document.getElementById('chart-container').style.display = 'none';
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            dischargeContainer.appendChild(downloadButton);
+            // 添加点击事件监听器
+            downloadButton.addEventListener('click', function () {
+              // 创建要下载的文件内容
+              const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+
+              // 创建临时链接
+              const blob = new Blob([fileContent], { type: 'application/json' });
+              const blobURL = URL.createObjectURL(blob);
+
+              // 创建下载链接
+              const downloadLink = document.createElement('a');
+              downloadLink.href = blobURL;
+              downloadLink.download = 'gate_meta.json';
+              downloadLink.style.display = 'none';
+
+              // 将下载链接添加到 DOM 中
+              document.body.appendChild(downloadLink);
+
+              // 模拟点击下载链接
+              downloadLink.click();
+
+              // 清理临时链接
+              URL.revokeObjectURL(blobURL);
+
+              // 从 DOM 中移除下载链接
+              document.body.removeChild(downloadLink);
+            });
+            dischargeContainer.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(dischargeContainer.style.left) || 0;
+              var startY = parseInt(dischargeContainer.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                dischargeContainer.style.left = startX + offsetX + 'px';
+                dischargeContainer.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+            if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
+              document.getElementById('chart-container').style.display = 'none';
+            }
+          }
+        }
       });
 
       map.addLayer({
@@ -631,24 +2177,258 @@ export default {
         interactive: true,
         clickable: true,
         layout: {
-          visibility: 'none' // 不可见
         }
       });
 
+      //点击各个区域时显示出Mass Change的图表
       map.on('click', 'greenlandSw-fill', function (e) {
-        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
-        map.setLayoutProperty('E_rate', 'visibility', 'none');
-        map.setLayoutProperty('R_rate', 'visibility', 'none');
-        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
-        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
-        map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = url + '/#/sw'
-      });
+        if (swFlag) {
+          map.setLayoutProperty('Grace_Vel', 'visibility', 'visible');
+          map.setLayoutProperty('E_rate', 'visibility', 'none');
+          map.setLayoutProperty('R_rate', 'visibility', 'none');
+          map.setLayoutProperty('SMB_rate', 'visibility', 'none');
+          map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
+          map.setLayoutProperty('gate_meta', 'visibility', 'visible');
+          isClickEventEnabled = false;
+          window.location.href = url + '/#/sw'
+        } else {
+          if (isClickEventEnabled) {
+            // 移除之前创建的表格
+            var chartContainer = document.getElementById('chart-container');
+            if (chartContainer) {
+              chartContainer.parentNode.removeChild(chartContainer);
+            }
 
+            var dischargeContainer = document.createElement('div');
+            dischargeContainer.id = 'chart-container';
+            dischargeContainer.style.position = 'relative';
+            dischargeContainer.style.left = '0px';
+            dischargeContainer.style.top = '0px';
+
+            mapContainer.appendChild(dischargeContainer);
+
+            // 获取边界线图层的边界经纬度坐标
+            var boundaryFeatures = map.querySourceFeatures('greenlandSw');
+
+            // 获取圆圈图层的所有圆圈要素
+            var circleFeatures = map.querySourceFeatures('gate_meta');
+
+            // 创建一个空数组用于存储合并后的结果
+            var mergedArray = [];
+
+            // 检查每个圆圈的中心点是否位于边界线图层的边界内，并打印符合条件的圆圈
+            circleFeatures.forEach(function (circle) {
+              var circleCenter = circle.geometry.coordinates;
+
+              // 检查中心点是否位于边界线图层的边界内
+              if (isPointWithinBoundary(circleCenter, boundaryFeatures)) {
+                var data = JSON.parse(circle.properties.speeds);
+                mergedArray.push(data);
+              }
+            });
+
+            const mergedResult = mergedArray.reduce((result, array) => {
+              array.forEach((item) => {
+                const existingItem = result.find((r) => r.time === item.time);
+                if (existingItem) {
+                  existingItem.discharge += item.discharge;
+                } else {
+                  result.push({ time: item.time, discharge: item.discharge });
+                }
+              });
+              return result;
+            }, []);
+
+            // 判断一个点是否位于边界线图层的边界内
+            function isPointWithinBoundary(point, boundaryFeatures) {
+              var polygon = turf.multiPolygon(boundaryFeatures.map(function (feature) {
+                return feature.geometry.coordinates;
+              }));
+              var pointOnLine = turf.point(point);
+              return turf.booleanPointInPolygon(pointOnLine, polygon);
+            }
+
+            var data = mergedResult;
+            var chartContainer = document.createElement('div');
+            chartContainer.setAttribute('id', 'totalChart');
+            chartContainer.style.width = '628px';
+            chartContainer.style.height = '400px';
+            chartContainer.style.left = '0px';
+            chartContainer.style.position = 'absolute';
+            chartContainer.style.backgroundColor = 'white';
+            chartContainer.style.zIndex = 999;
+            dischargeContainer.appendChild(chartContainer);
+            var myChart = echarts.init(chartContainer);
+
+            myChart.setOption({
+              title: {
+                text: 'SW',   // 设置标题文本
+                textStyle: {              // 标题文字样式配置
+                  color: 'black',
+                  fontSize: 15,
+                },
+                left: 'center',   // 设置标题水平居中
+                top: '10px',
+              },
+              tooltip: {
+                trigger: "item",
+              },
+              xAxis: {
+                type: 'time',
+                data: data.map(item => item.time),
+                min: '1986', // 设置 X 轴的最小值
+                max: '2023', // 设置 X 轴的最大值
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              yAxis: {
+                type: 'value',
+                name: 'Discharge (Gt/yr)',
+                nameLocation: "middle",
+                nameTextStyle: {
+                  fontSize: 15,
+                },
+                nameGap: 40,
+                axisLabel: {
+                  fontFamily: 'Arial', // 设置字体
+                  fontSize: 15,        // 设置字号
+                  color: '#333'        // 设置颜色
+                },
+                axisLine: {
+                  show: false,
+                },
+                axisTick: {
+                  show: false,
+                }
+              },
+              grid: {
+                width: '80%',  // 设置宽度为80%
+                height: '70%',  // 设置高度为80%
+                left: '10%',
+                top: '15%',
+              },
+              series: [
+                {
+                  type: 'scatter',
+                  name: 'discharge',
+                  data: data.map(item => [item.time, item.discharge]),
+                  color: 'red',
+                  tooltip: {
+                    trigger: 'item',
+                    formatter: function (params) {
+                      const year = params.value[0];
+                      const discharge = params.value[1].toFixed(3);
+                      return "time:" + year + "<br />" + "discharge: " + discharge;
+                    }
+                  }
+                }
+              ],
+              toolbox: {
+                feature: {
+                  saveAsImage: {},
+                },
+                itemSize: 18,
+                itemGap: 20,
+                right: 70,
+              },
+            });
+
+            // 创建一个按钮元素
+            var closeButton = document.createElement('button');
+            closeButton.innerHTML = '关闭';
+            closeButton.id = 'close-button';
+            closeButton.style.position = 'absolute';
+            closeButton.style.left = '580px';
+            closeButton.style.top = '5px';
+            closeButton.style.zIndex = 999;
+            // 将按钮添加到地图容器中
+            dischargeContainer.appendChild(closeButton);
+            // 添加点击事件监听器
+            closeButton.addEventListener('click', function () {
+              document.getElementById('chart-container').style.display = 'none';
+            });
+
+            var downloadButton = document.createElement('button');
+            downloadButton.innerHTML = '下载数据';
+            downloadButton.id = 'download-button';
+            downloadButton.style.position = 'absolute';
+            downloadButton.style.left = '440px';
+            downloadButton.style.top = '5px';
+            downloadButton.style.zIndex = 999;
+
+            // 将按钮添加到地图容器中
+            dischargeContainer.appendChild(downloadButton);
+            // 添加点击事件监听器
+            downloadButton.addEventListener('click', function () {
+              // 创建要下载的文件内容
+              const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+
+              // 创建临时链接
+              const blob = new Blob([fileContent], { type: 'application/json' });
+              const blobURL = URL.createObjectURL(blob);
+
+              // 创建下载链接
+              const downloadLink = document.createElement('a');
+              downloadLink.href = blobURL;
+              downloadLink.download = 'gate_meta.json';
+              downloadLink.style.display = 'none';
+
+              // 将下载链接添加到 DOM 中
+              document.body.appendChild(downloadLink);
+
+              // 模拟点击下载链接
+              downloadLink.click();
+
+              // 清理临时链接
+              URL.revokeObjectURL(blobURL);
+
+              // 从 DOM 中移除下载链接
+              document.body.removeChild(downloadLink);
+            });
+            dischargeContainer.addEventListener('mousedown', startDrag);
+            function startDrag(e) {
+              e.preventDefault();
+
+              var initialX = e.clientX;
+              var initialY = e.clientY;
+              var startX = parseInt(dischargeContainer.style.left) || 0;
+              var startY = parseInt(dischargeContainer.style.top) || 0;
+
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+
+              function handleMove(e) {
+                var offsetX = e.clientX - initialX;
+                var offsetY = e.clientY - initialY;
+
+                dischargeContainer.style.left = startX + offsetX + 'px';
+                dischargeContainer.style.top = startY + offsetY + 'px';
+              }
+
+              function handleUp() {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              }
+            }
+            if (document.getElementById('glacierChart-container') && document.getElementById('glacierChart-container').style.display != 'none') {
+              document.getElementById('chart-container').style.display = 'none';
+            }
+          }
+        }
+      });
 
       // 创建一个按钮元素
       var massChangeButton = document.createElement('button');
-      massChangeButton.innerHTML = 'Mass Change';
+      massChangeButton.innerHTML = 'Greenland Mass Change';
       massChangeButton.id = 'mass-change-button';
 
       // 将按钮添加到地图容器中
@@ -656,17 +2436,55 @@ export default {
 
       // 为按钮添加 click 事件处理程序
       massChangeButton.addEventListener('click', function () {
+        cwFlag = true;
+        neFlag = true;
+        noFlag = true;
+        nwFlag = true;
+        seFlag = true;
+        swFlag = true;
 
-        map.boxZoom.enable();
-        map.dragPan.enable();
-        map.scrollZoom.enable();
+        // 设置地图中心点和缩放级别
+        map.setCenter([-42.6043, 90]);
+        map.setZoom(2);
+        map.setCenter([-42.6043, 90]);
 
-        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
+        if (container.contains(GraceVellabel)) {
+          container.removeChild(GraceVellabel);
+          container.removeChild(GraceVelcolorbar);
+        }
+
+        if (container.contains(Elabel)) {
+          container.removeChild(Elabel);
+          container.removeChild(Ecolorbar);
+        }
+
+        if (container.contains(SMBlabel)) {
+          container.removeChild(SMBlabel);
+          container.removeChild(SMBcolorbar);
+        }
+
+        if (container.contains(Plabel)) {
+          container.removeChild(Plabel);
+          container.removeChild(Pcolorbar);
+        }
+
+        if (container.contains(Rlabel)) {
+          container.removeChild(Rlabel);
+          container.removeChild(Rcolorbar);
+        }
+
+        container.appendChild(GraceVellabel);
+        container.appendChild(GraceVelcolorbar);
+        legendsContainer.append(legendContainer);
+
+        isClickEventEnabled = false;
+
+        map.setLayoutProperty('Grace_Vel', 'visibility', 'visible');
         map.setLayoutProperty('E_rate', 'visibility', 'none');
         map.setLayoutProperty('R_rate', 'visibility', 'none');
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
-        map.setLayoutProperty('gate_meta', 'visibility', 'none');
+        map.setLayoutProperty('gate_meta', 'visibility', 'visible');
 
         map.setLayoutProperty('greenlandNo-fill', 'visibility', 'visible');
         map.setLayoutProperty('greenlandNe-fill', 'visibility', 'visible');
@@ -679,40 +2497,8 @@ export default {
       });
 
       // 创建一个按钮元素
-      var graceVelButton = document.createElement('button');
-      graceVelButton.innerHTML = 'Grace Vel';
-      graceVelButton.classList.add('rate-button');
-      graceVelButton.id = 'grace-vel-button';
-
-      // 将按钮添加到地图容器中
-      map.getContainer().appendChild(graceVelButton);
-
-      // 添加点击事件监听器
-      graceVelButton.addEventListener('click', function () {
-
-        // 禁用地图移动和缩放
-        map.boxZoom.disable();
-        map.dragPan.disable();
-        map.scrollZoom.disable();
-        map.doubleClickZoom.disable();
-
-        // 设置地图中心点和缩放级别
-        map.setCenter([-42.6043, 90]);
-        map.setZoom(2);
-
-
-        map.setLayoutProperty('Grace_Vel', 'visibility', 'visible');
-        map.setLayoutProperty('E_rate', 'visibility', 'none');
-        map.setLayoutProperty('R_rate', 'visibility', 'none');
-        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
-        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
-        map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = url + '/#/GraceVel';
-      });
-
-      // 创建一个按钮元素
       var eRateButton = document.createElement('button');
-      eRateButton.innerHTML = 'E Rate';
+      eRateButton.innerHTML = 'EVAP + SUBL';
       eRateButton.classList.add('rate-button');
       eRateButton.id = 'e-rate-button';
 
@@ -721,15 +2507,44 @@ export default {
 
       // 添加点击事件监听器
       eRateButton.addEventListener('click', function () {
+        cwFlag = false;
+        neFlag = false;
+        noFlag = false;
+        nwFlag = false;
+        seFlag = false;
+        swFlag = false;
 
-        // 禁用地图移动和缩放
-        map.boxZoom.disable();
-        map.dragPan.disable();
-        map.scrollZoom.disable();
-        map.doubleClickZoom.disable();
+        if (container.contains(GraceVellabel)) {
+          container.removeChild(GraceVellabel);
+          container.removeChild(GraceVelcolorbar);
+        }
+
+        if (container.contains(SMBlabel)) {
+          container.removeChild(SMBlabel);
+          container.removeChild(SMBcolorbar);
+        }
+
+        if (container.contains(Plabel)) {
+          container.removeChild(Plabel);
+          container.removeChild(Pcolorbar);
+        }
+
+        if (container.contains(Rlabel)) {
+          container.removeChild(Rlabel);
+          container.removeChild(Rcolorbar);
+        }
+
+        if (legendsContainer.contains(legendContainer)) {
+          legendsContainer.removeChild(legendContainer);
+        }
+
+        container.append(Elabel);
+        container.append(Ecolorbar);
+
         // 设置地图中心点和缩放级别
         map.setCenter([-42.6043, 90]);
         map.setZoom(2);
+        map.setCenter([-42.6043, 90]);
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'visible');
@@ -737,13 +2552,20 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = url + '/#/ERate';
 
+        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'none');
       });
+
+      isClickEventEnabled = false;
 
       // 创建一个按钮元素
       var rRateButton = document.createElement('button');
-      rRateButton.innerHTML = 'R Rate';
+      rRateButton.innerHTML = 'Runoff';
       rRateButton.classList.add('rate-button');
       rRateButton.id = 'r-rate-button';
 
@@ -752,14 +2574,44 @@ export default {
 
       // 添加点击事件监听器
       rRateButton.addEventListener('click', function () {
-        // 禁用地图移动和缩放
-        map.boxZoom.disable();
-        map.dragPan.disable();
-        map.scrollZoom.disable();
-        map.doubleClickZoom.disable();
+        cwFlag = false;
+        neFlag = false;
+        noFlag = false;
+        nwFlag = false;
+        seFlag = false;
+        swFlag = false;
+
+        if (container.contains(GraceVellabel)) {
+          container.removeChild(GraceVellabel);
+          container.removeChild(GraceVelcolorbar);
+        }
+
+        if (container.contains(Elabel)) {
+          container.removeChild(Elabel);
+          container.removeChild(Ecolorbar);
+        }
+
+        if (container.contains(SMBlabel)) {
+          container.removeChild(SMBlabel);
+          container.removeChild(SMBcolorbar);
+        }
+
+        if (container.contains(Plabel)) {
+          container.removeChild(Plabel);
+          container.removeChild(Pcolorbar);
+        }
+
+        if (legendsContainer.contains(legendContainer)) {
+          legendsContainer.removeChild(legendContainer);
+        }
+
+        container.appendChild(Rlabel);
+        container.appendChild(Rcolorbar);
+
         // 设置地图中心点和缩放级别
         map.setCenter([-42.6043, 90]);
         map.setZoom(2);
+        map.setCenter([-42.6043, 90]);
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'none');
@@ -767,12 +2619,20 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = url + '/#/RRate';
+
+        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'none');
       });
+
+      isClickEventEnabled = false;
 
       // 创建一个按钮元素
       var smbRateButton = document.createElement('button');
-      smbRateButton.innerHTML = 'SMB Rate';
+      smbRateButton.innerHTML = 'SMB';
       smbRateButton.classList.add('rate-button');
       smbRateButton.id = 'smb-rate-button';
 
@@ -781,15 +2641,44 @@ export default {
 
       // 添加点击事件监听器
       smbRateButton.addEventListener('click', function () {
+        cwFlag = false;
+        neFlag = false;
+        noFlag = false;
+        nwFlag = false;
+        seFlag = false;
+        swFlag = false;
 
-        // 禁用地图移动和缩放
-        map.boxZoom.disable();
-        map.dragPan.disable();
-        map.scrollZoom.disable();
-        map.doubleClickZoom.disable();
+        if (container.contains(GraceVellabel)) {
+          container.removeChild(GraceVellabel);
+          container.removeChild(GraceVelcolorbar);
+        }
+
+        if (container.contains(Elabel)) {
+          container.removeChild(Elabel);
+          container.removeChild(Ecolorbar);
+        }
+
+        if (container.contains(Plabel)) {
+          container.removeChild(Plabel);
+          container.removeChild(Pcolorbar);
+        }
+
+        if (container.contains(Rlabel)) {
+          container.removeChild(Rlabel);
+          container.removeChild(Rcolorbar);
+        }
+
+        if (legendsContainer.contains(legendContainer)) {
+          legendsContainer.removeChild(legendContainer);
+        }
+
+        container.appendChild(SMBlabel);
+        container.appendChild(SMBcolorbar);
+
         // 设置地图中心点和缩放级别
         map.setCenter([-42.6043, 90]);
         map.setZoom(2);
+        map.setCenter([-42.6043, 90]);
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'none');
@@ -797,12 +2686,20 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'visible');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = url + '/#/SMBRate';
+
+        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'none');
       });
+
+      isClickEventEnabled = false;
 
       // 创建一个按钮元素
       var pRateButton = document.createElement('button');
-      pRateButton.innerHTML = 'P Rate';
+      pRateButton.innerHTML = 'Precipitation';
       pRateButton.classList.add('rate-button');
       pRateButton.id = 'p-rate-button';
 
@@ -811,14 +2708,44 @@ export default {
 
       // 添加点击事件监听器
       pRateButton.addEventListener('click', function () {
-        // 禁用地图移动和缩放
-        map.boxZoom.disable();
-        map.dragPan.disable();
-        map.scrollZoom.disable();
-        map.doubleClickZoom.disable();
+        cwFlag = false;
+        neFlag = false;
+        noFlag = false;
+        nwFlag = false;
+        seFlag = false;
+        swFlag = false;
+
+        if (container.contains(GraceVellabel)) {
+          container.removeChild(GraceVellabel);
+          container.removeChild(GraceVelcolorbar);
+        }
+
+        if (container.contains(Elabel)) {
+          container.removeChild(Elabel);
+          container.removeChild(Ecolorbar);
+        }
+
+        if (container.contains(SMBlabel)) {
+          container.removeChild(SMBlabel);
+          container.removeChild(SMBcolorbar);
+        }
+
+        if (container.contains(Rlabel)) {
+          container.removeChild(Rlabel);
+          container.removeChild(Rcolorbar);
+        }
+
+        if (legendsContainer.contains(legendContainer)) {
+          legendsContainer.removeChild(legendContainer);
+        }
+
+        container.appendChild(Plabel);
+        container.appendChild(Pcolorbar);
+
         // 设置地图中心点和缩放级别
         map.setCenter([-42.6043, 90]);
         map.setZoom(2);
+        map.setCenter([-42.6043, 90]);
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'none');
@@ -826,29 +2753,16 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'visible');
         map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        window.location.href = url + '/#/PRate';
+
+        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'none');
+        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'none');
       });
 
-      // 创建一个按钮元素
-      var clearButton = document.createElement('button');
-      clearButton.innerHTML = 'Clear';
-      clearButton.classList.add('rate-button');
-      clearButton.id = 'clear-button';
-
-      // 将按钮添加到地图容器中
-      map.getContainer().appendChild(clearButton);
-
-      // 为按钮添加 click 事件处理程序
-      clearButton.addEventListener('click', function () {
-        map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
-        map.setLayoutProperty('E_rate', 'visibility', 'none');
-        map.setLayoutProperty('R_rate', 'visibility', 'none');
-        map.setLayoutProperty('SMB_rate', 'visibility', 'none');
-        map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
-        map.setLayoutProperty('gate_meta', 'visibility', 'none');
-        // 在单击时将用户重定向到新页面
-        window.location.href = url + '/#/';
-      });
+      isClickEventEnabled = false;
 
       // 创建一个按钮元素
       var dischargeButton = document.createElement('button');
@@ -862,17 +2776,50 @@ export default {
       // 为按钮添加 click 事件处理程序
       dischargeButton.addEventListener('click', function () {
 
-        // 禁用交互操作
-        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'none');
-        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'none');
+        cwFlag = false;
+        neFlag = false;
+        noFlag = false;
+        nwFlag = false;
+        seFlag = false;
+        swFlag = false;
 
         map.boxZoom.enable();
         map.dragPan.enable();
         map.scrollZoom.enable();
+
+        // 设置地图中心点和缩放级别
+        map.setCenter([-42.6043, 90]);
+        map.setZoom(2);
+        map.setCenter([-42.6043, 90]);
+
+        if (container.contains(GraceVellabel)) {
+          container.removeChild(GraceVellabel);
+          container.removeChild(GraceVelcolorbar);
+        }
+
+        if (container.contains(Elabel)) {
+          container.removeChild(Elabel);
+          container.removeChild(Ecolorbar);
+        }
+
+        if (container.contains(SMBlabel)) {
+          container.removeChild(SMBlabel);
+          container.removeChild(SMBcolorbar);
+        }
+
+        if (container.contains(Rlabel)) {
+          container.removeChild(Rlabel);
+          container.removeChild(Rcolorbar);
+        }
+
+        if (container.contains(Plabel)) {
+          container.removeChild(Plabel);
+          container.removeChild(Pcolorbar);
+        }
+
+        legendsContainer.append(legendContainer);
+
+        isClickEventEnabled = true;
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'none');
@@ -881,8 +2828,13 @@ export default {
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'visible');
 
-        // 在单击时将用户重定向到新页面
-        window.location.href = url + '/#/';
+        map.setLayoutProperty('greenlandNo-fill', 'visibility', 'visible');
+        map.setLayoutProperty('greenlandNe-fill', 'visibility', 'visible');
+        map.setLayoutProperty('greenlandNw-fill', 'visibility', 'visible');
+        map.setLayoutProperty('greenlandSe-fill', 'visibility', 'visible');
+        map.setLayoutProperty('greenlandSw-fill', 'visibility', 'visible');
+        map.setLayoutProperty('greenlandCw-fill', 'visibility', 'visible');
+
       });
 
     });
@@ -895,7 +2847,7 @@ export default {
   top: 10px;
   left: 10px;
   height: 40px;
-  width: 120px;
+  width: 180px;
   z-index: 1;
   padding: 10px;
   background-color: #F0F0EF;
@@ -916,7 +2868,7 @@ export default {
   position: absolute;
   left: 10px;
   height: 40px;
-  width: 120px;
+  width: 180px;
   z-index: 1;
   padding: 10px;
   background-color: #F0F0EF;
@@ -931,10 +2883,6 @@ export default {
 
 .rate-button:hover {
   background-color: rgb(151, 179, 232);
-}
-
-#grace-vel-button {
-  top: 50px;
 }
 
 #e-rate-button {
@@ -954,10 +2902,6 @@ export default {
 }
 
 #discharge-button {
-  top: 250px;
-}
-
-#clear-button {
-  top: 290px;
+  top: 50px;
 }
 </style>
