@@ -147,7 +147,7 @@ Promise.all([
             {
                 type: "scatter",
                 data: GraceData,
-                name: "Grace",
+                name: "GRACE",
                 itemStyle: {
                     // 修改散点的颜色
                     color: 'rgba(255, 0, 0, 0.8)',
@@ -227,7 +227,7 @@ Promise.all([
             {
                 type: "scatter",
                 data: GraceData,
-                name: "Grace",
+                name: "GRACE",
                 itemStyle: {
                     // 修改散点的颜色
                     color: 'rgba(255, 0, 0, 0.8)',

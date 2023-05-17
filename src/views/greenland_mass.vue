@@ -41,17 +41,14 @@ function startDrag(e) {
 
 function downloadData() {
     Promise.all([
-        fetch('./src/data/Grace_mass.json').then(response => response.json()),
-        fetch('./src/data/MBM_mass.json').then(response => response.json())
+        fetch('./src/data/download/GRACE_mass.csv').then(response => response.text()), // 使用 response.text() 解析 CSV 数据
+        fetch('./src/data/download/MBM_mass.csv').then(response => response.text()) // 使用 response.text() 解析 CSV 数据
     ]).then(([GraceData, MBMData]) => {
-        const graceDataContent = JSON.stringify(GraceData);
-        const mbmDataContent = JSON.stringify(MBMData);
+        const graceDataBlob = new Blob([GraceData], { type: 'text/csv' }); // 将数据转换为 Blob 类型并指定 MIME 类型为 'text/csv'
+        const mbmDataBlob = new Blob([MBMData], { type: 'text/csv' }); // 将数据转换为 Blob 类型并指定 MIME 类型为 'text/csv'
 
-        const graceDataBlob = new Blob([graceDataContent], { type: 'application/json' });
-        const mbmDataBlob = new Blob([mbmDataContent], { type: 'application/json' });
-
-        const graceDataFileName = 'Grace_mass.json';
-        const mbmDataFileName = 'MBM_mass.json';
+        const graceDataFileName = 'GRACE_mass.csv';
+        const mbmDataFileName = 'MBM_mass.csv';
 
         const graceDataLink = document.createElement('a');
         graceDataLink.href = window.URL.createObjectURL(graceDataBlob);
@@ -64,6 +61,7 @@ function downloadData() {
         mbmDataLink.click();
     });
 }
+
 
 function close() {
     var url = 'http://localhost:7070';
@@ -155,7 +153,7 @@ Promise.all([
             {
                 type: "scatter",
                 data: GraceData,
-                name: "Grace",
+                name: "GRACE",
                 itemStyle: {
                     // 修改散点的颜色
                     color: 'rgba(255, 0, 0, 0.8)',
@@ -228,7 +226,7 @@ Promise.all([
             {
                 type: "scatter",
                 data: GraceData,
-                name: "Grace",
+                name: "GRACE",
                 itemStyle: {
                     // 修改散点的颜色
                     color: 'rgba(255, 0, 0, 0.8)',

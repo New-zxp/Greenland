@@ -21,6 +21,7 @@ export default {
       zoom: 2, //缩放大小
       doubleClickZoom: false,
       dragRotate: false, // 禁止地图旋转
+      // scrollZoom: false
     });
     map.on('load', function () {
       //添加流域边界数据
@@ -58,7 +59,7 @@ export default {
       var coordinates = [-65, 58]; // 替换为您想要显示容器的地理坐标
       var pixelCoordinates = map.project(coordinates);
 
-      //创建colorbar容器
+      // 创建colorbar容器
       var container = document.createElement('div');
       container.style.position = 'absolute';
       container.style.width = '280px';
@@ -71,10 +72,12 @@ export default {
       var mapContainer = document.getElementById('map');
       mapContainer.appendChild(container);
 
+      // 记录初始地图中心点的像素坐标
+      var initialPixelCenter = map.project(map.getCenter());
+
       // 监听地图移动事件
       map.on('move', function () {
         // 获取地理坐标的像素坐标
-        var coordinates = [-65, 58]; // 替换为您想要显示容器的地理坐标
         var pixelCoordinates = map.project(coordinates);
 
         // 设置容器的位置
@@ -87,13 +90,23 @@ export default {
         // 获取当前地图缩放级别
         var zoom = map.getZoom();
 
-        // 根据缩放级别控制容器的可见性
-        if (zoom >= 2.5) {
-          container.style.display = 'none'; // 当地图缩放到达特定倍数时隐藏容器
-        } else if (zoom <= 1.8) {
-          container.style.display = 'none'; // 当地图缩放到达特定倍数时隐藏容器
+        // 获取当前地图中心点的像素坐标
+        var currentPixelCenter = map.project(map.getCenter());
+
+        // 计算当前缩放级别相对于初始缩放级别的比例
+        var scaleRatio = Math.pow(2, zoom - map.transform.startZoom);
+
+        // 计算容器相对于初始中心点的偏移量
+        var offset = currentPixelCenter.sub(initialPixelCenter).mult(1 / scaleRatio);
+
+        // 更新容器的位置
+        container.style.left = pixelCoordinates.x + offset.x + 'px';
+        container.style.top = pixelCoordinates.y + offset.y + 'px';
+
+        if (zoom <= 2.5) {
+          container.style.transform = 'scale(' + zoom / 2 + ')';
         } else {
-          container.style.display = 'block'; // 在其他情况下显示容器
+          container.style.transform = 'scale(' + 2.5 / 2 + ')';
         }
       });
 
@@ -171,7 +184,7 @@ export default {
       var Eintervals = [-40, 500];
       let Egradient = 'linear-gradient(to right, ';
       var Elabel = document.createElement('div');
-      Elabel.innerHTML = 'Evapotranspiration mm/year';
+      Elabel.innerHTML = 'Evapotranspiration (mm/year)';
       Elabel.style.textAlign = 'center';
       Elabel.style.fontSize = "15px"
       var Ecolorbar = document.createElement('div');
@@ -226,7 +239,7 @@ export default {
       var Rintervals = [0, 5300];
       let Rgradient = 'linear-gradient(to right, ';
       var Rlabel = document.createElement('div');
-      Rlabel.innerHTML = 'Runoff mm/year';
+      Rlabel.innerHTML = 'Runoff (mm/year)';
       Rlabel.style.textAlign = 'center';
       Rlabel.style.fontSize = "15px"
       var Rcolorbar = document.createElement('div');
@@ -281,7 +294,7 @@ export default {
       var SMBintervals = [-40, 0, 40];
       let SMBgradient = 'linear-gradient(to right, ';
       var SMBlabel = document.createElement('div');
-      SMBlabel.innerHTML = 'SMB cm/year';
+      SMBlabel.innerHTML = 'SMB (cm/year)';
       SMBlabel.style.textAlign = 'center';
       SMBlabel.style.fontSize = "15px"
       var SMBcolorbar = document.createElement('div');
@@ -337,7 +350,7 @@ export default {
       var Pintervals = [40, 4000];
       let Pgradient = 'linear-gradient(to right, ';
       var Plabel = document.createElement('div');
-      Plabel.innerHTML = 'Precipitation mm/year';
+      Plabel.innerHTML = 'Precipitation (mm/year)';
       Plabel.style.textAlign = 'center';
       Plabel.style.fontSize = "15px"
       var Pcolorbar = document.createElement('div');
@@ -417,14 +430,10 @@ export default {
       map.on('zoom', function () {
         // 获取当前地图缩放级别
         var zoom = map.getZoom();
-
-        // 根据缩放级别控制容器的可见性
-        if (zoom >= 2.5) {
-          legendsContainer.style.display = 'none'; // 当地图缩放到达特定倍数时隐藏容器
-        } else if (zoom <= 1.8) {
-          legendsContainer.style.display = 'none'; // 当地图缩放到达特定倍数时隐藏容器
+        if (zoom <= 2.5) {
+          legendsContainer.style.transform = 'scale(' + zoom / 2 + ')';
         } else {
-          legendsContainer.style.display = 'block'; // 在其他情况下显示容器
+          legendsContainer.style.transform = 'scale(' + 2.5 / 2 + ')';
         }
       });
 
@@ -437,6 +446,11 @@ export default {
       legendContainer.style.padding = '10px';
       legendContainer.style.borderRadius = '4px';
       legendsContainer.appendChild(legendContainer);
+
+      // 添加图例标题
+      var legendTitle = document.createElement('div');
+      legendTitle.textContent = 'Discharge (Gt/yr)';
+      legendContainer.appendChild(legendTitle);
 
       // 定义不同半径值对应的图例样式
       var legendStyles = [
@@ -658,19 +672,23 @@ export default {
 
           // 将按钮添加到地图容器中
           glacierDischargeContainer.appendChild(downloadButton);
+
           // 添加点击事件监听器
           downloadButton.addEventListener('click', function () {
-            // 创建要下载的文件内容
-            const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+            // 转换为 CSV 格式
+            let csvContent = 'Time,Discharge (Gt/yr)\n'; // CSV 标题行
+            data.forEach(function (item) {
+              csvContent += item.time + ',' + item.discharge + '\n'; // 数据行
+            });
 
             // 创建临时链接
-            const blob = new Blob([fileContent], { type: 'application/json' });
+            const blob = new Blob([csvContent], { type: 'text/csv' });
             const blobURL = URL.createObjectURL(blob);
 
             // 创建下载链接
             const downloadLink = document.createElement('a');
             downloadLink.href = blobURL;
-            downloadLink.download = 'gate_meta.json';
+            downloadLink.download = 'glacier_' + '.csv'; // 文件名中添加序号
             downloadLink.style.display = 'none';
 
             // 将下载链接添加到 DOM 中
@@ -685,6 +703,7 @@ export default {
             // 从 DOM 中移除下载链接
             document.body.removeChild(downloadLink);
           });
+
 
           glacierDischargeContainer.addEventListener('mousedown', startDrag);
           function startDrag(e) {
@@ -952,30 +971,22 @@ export default {
           dischargeContainer.appendChild(downloadButton);
           // 添加点击事件监听器
           downloadButton.addEventListener('click', function () {
-            // 创建要下载的文件内容
-            const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+            // 将数据转换为 CSV 格式
+            var csvContent = 'data:text/csv;charset=utf-8,';
 
-            // 创建临时链接
-            const blob = new Blob([fileContent], { type: 'application/json' });
-            const blobURL = URL.createObjectURL(blob);
+            // 添加 CSV 标题行
+            csvContent += 'Time,Discharge (Gt/yr)\n';
 
-            // 创建下载链接
-            const downloadLink = document.createElement('a');
-            downloadLink.href = blobURL;
-            downloadLink.download = 'gate_meta.json';
-            downloadLink.style.display = 'none';
+            // 添加数据行
+            data.forEach(function (item) {
+              csvContent += item.time + ',' + item.discharge + '\n';
+            });
 
-            // 将下载链接添加到 DOM 中
-            document.body.appendChild(downloadLink);
-
-            // 模拟点击下载链接
-            downloadLink.click();
-
-            // 清理临时链接
-            URL.revokeObjectURL(blobURL);
-
-            // 从 DOM 中移除下载链接
-            document.body.removeChild(downloadLink);
+            // 创建下载链接并设置文件名
+            var dataLink = document.createElement('a');
+            dataLink.href = encodeURI(csvContent);
+            dataLink.download = 'CW_Discharge.csv';
+            dataLink.click();
           });
 
           dischargeContainer.addEventListener('mousedown', startDrag);
@@ -1234,30 +1245,22 @@ export default {
             dischargeContainer.appendChild(downloadButton);
             // 添加点击事件监听器
             downloadButton.addEventListener('click', function () {
-              // 创建要下载的文件内容
-              const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+              // 将数据转换为 CSV 格式
+              var csvContent = 'data:text/csv;charset=utf-8,';
 
-              // 创建临时链接
-              const blob = new Blob([fileContent], { type: 'application/json' });
-              const blobURL = URL.createObjectURL(blob);
+              // 添加 CSV 标题行
+              csvContent += 'Time,Discharge (Gt/yr)\n';
 
-              // 创建下载链接
-              const downloadLink = document.createElement('a');
-              downloadLink.href = blobURL;
-              downloadLink.download = 'gate_meta.json';
-              downloadLink.style.display = 'none';
+              // 添加数据行
+              data.forEach(function (item) {
+                csvContent += item.time + ',' + item.discharge + '\n';
+              });
 
-              // 将下载链接添加到 DOM 中
-              document.body.appendChild(downloadLink);
-
-              // 模拟点击下载链接
-              downloadLink.click();
-
-              // 清理临时链接
-              URL.revokeObjectURL(blobURL);
-
-              // 从 DOM 中移除下载链接
-              document.body.removeChild(downloadLink);
+              // 创建下载链接并设置文件名
+              var dataLink = document.createElement('a');
+              dataLink.href = encodeURI(csvContent);
+              dataLink.download = 'NE_Discharge.csv';
+              dataLink.click();
             });
             dischargeContainer.addEventListener('mousedown', startDrag);
             function startDrag(e) {
@@ -1519,30 +1522,22 @@ export default {
             dischargeContainer.appendChild(downloadButton);
             // 添加点击事件监听器
             downloadButton.addEventListener('click', function () {
-              // 创建要下载的文件内容
-              const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+              // 将数据转换为 CSV 格式
+              var csvContent = 'data:text/csv;charset=utf-8,';
 
-              // 创建临时链接
-              const blob = new Blob([fileContent], { type: 'application/json' });
-              const blobURL = URL.createObjectURL(blob);
+              // 添加 CSV 标题行
+              csvContent += 'Time,Discharge (Gt/yr)\n';
 
-              // 创建下载链接
-              const downloadLink = document.createElement('a');
-              downloadLink.href = blobURL;
-              downloadLink.download = 'gate_meta.json';
-              downloadLink.style.display = 'none';
+              // 添加数据行
+              data.forEach(function (item) {
+                csvContent += item.time + ',' + item.discharge + '\n';
+              });
 
-              // 将下载链接添加到 DOM 中
-              document.body.appendChild(downloadLink);
-
-              // 模拟点击下载链接
-              downloadLink.click();
-
-              // 清理临时链接
-              URL.revokeObjectURL(blobURL);
-
-              // 从 DOM 中移除下载链接
-              document.body.removeChild(downloadLink);
+              // 创建下载链接并设置文件名
+              var dataLink = document.createElement('a');
+              dataLink.href = encodeURI(csvContent);
+              dataLink.download = 'NO_Discharge.csv';
+              dataLink.click();
             });
             dischargeContainer.addEventListener('mousedown', startDrag);
             function startDrag(e) {
@@ -1802,30 +1797,22 @@ export default {
             dischargeContainer.appendChild(downloadButton);
             // 添加点击事件监听器
             downloadButton.addEventListener('click', function () {
-              // 创建要下载的文件内容
-              const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+              // 将数据转换为 CSV 格式
+              var csvContent = 'data:text/csv;charset=utf-8,';
 
-              // 创建临时链接
-              const blob = new Blob([fileContent], { type: 'application/json' });
-              const blobURL = URL.createObjectURL(blob);
+              // 添加 CSV 标题行
+              csvContent += 'Time,Discharge (Gt/yr)\n';
 
-              // 创建下载链接
-              const downloadLink = document.createElement('a');
-              downloadLink.href = blobURL;
-              downloadLink.download = 'gate_meta.json';
-              downloadLink.style.display = 'none';
+              // 添加数据行
+              data.forEach(function (item) {
+                csvContent += item.time + ',' + item.discharge + '\n';
+              });
 
-              // 将下载链接添加到 DOM 中
-              document.body.appendChild(downloadLink);
-
-              // 模拟点击下载链接
-              downloadLink.click();
-
-              // 清理临时链接
-              URL.revokeObjectURL(blobURL);
-
-              // 从 DOM 中移除下载链接
-              document.body.removeChild(downloadLink);
+              // 创建下载链接并设置文件名
+              var dataLink = document.createElement('a');
+              dataLink.href = encodeURI(csvContent);
+              dataLink.download = 'NW_Discharge.csv';
+              dataLink.click();
             });
             dischargeContainer.addEventListener('mousedown', startDrag);
             function startDrag(e) {
@@ -2085,31 +2072,24 @@ export default {
             // 将按钮添加到地图容器中
             dischargeContainer.appendChild(downloadButton);
             // 添加点击事件监听器
+            // 添加点击事件监听器
             downloadButton.addEventListener('click', function () {
-              // 创建要下载的文件内容
-              const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+              // 将数据转换为 CSV 格式
+              var csvContent = 'data:text/csv;charset=utf-8,';
 
-              // 创建临时链接
-              const blob = new Blob([fileContent], { type: 'application/json' });
-              const blobURL = URL.createObjectURL(blob);
+              // 添加 CSV 标题行
+              csvContent += 'Time,Discharge (Gt/yr)\n';
 
-              // 创建下载链接
-              const downloadLink = document.createElement('a');
-              downloadLink.href = blobURL;
-              downloadLink.download = 'gate_meta.json';
-              downloadLink.style.display = 'none';
+              // 添加数据行
+              data.forEach(function (item) {
+                csvContent += item.time + ',' + item.discharge + '\n';
+              });
 
-              // 将下载链接添加到 DOM 中
-              document.body.appendChild(downloadLink);
-
-              // 模拟点击下载链接
-              downloadLink.click();
-
-              // 清理临时链接
-              URL.revokeObjectURL(blobURL);
-
-              // 从 DOM 中移除下载链接
-              document.body.removeChild(downloadLink);
+              // 创建下载链接并设置文件名
+              var dataLink = document.createElement('a');
+              dataLink.href = encodeURI(csvContent);
+              dataLink.download = 'SE_Discharge.csv';
+              dataLink.click();
             });
             dischargeContainer.addEventListener('mousedown', startDrag);
             function startDrag(e) {
@@ -2369,30 +2349,22 @@ export default {
             dischargeContainer.appendChild(downloadButton);
             // 添加点击事件监听器
             downloadButton.addEventListener('click', function () {
-              // 创建要下载的文件内容
-              const fileContent = JSON.stringify(map.getSource('gate_meta')._data);
+              // 将数据转换为 CSV 格式
+              var csvContent = 'data:text/csv;charset=utf-8,';
 
-              // 创建临时链接
-              const blob = new Blob([fileContent], { type: 'application/json' });
-              const blobURL = URL.createObjectURL(blob);
+              // 添加 CSV 标题行
+              csvContent += 'Time,Discharge (Gt/yr)\n';
 
-              // 创建下载链接
-              const downloadLink = document.createElement('a');
-              downloadLink.href = blobURL;
-              downloadLink.download = 'gate_meta.json';
-              downloadLink.style.display = 'none';
+              // 添加数据行
+              data.forEach(function (item) {
+                csvContent += item.time + ',' + item.discharge + '\n';
+              });
 
-              // 将下载链接添加到 DOM 中
-              document.body.appendChild(downloadLink);
-
-              // 模拟点击下载链接
-              downloadLink.click();
-
-              // 清理临时链接
-              URL.revokeObjectURL(blobURL);
-
-              // 从 DOM 中移除下载链接
-              document.body.removeChild(downloadLink);
+              // 创建下载链接并设置文件名
+              var dataLink = document.createElement('a');
+              dataLink.href = encodeURI(csvContent);
+              dataLink.download = 'SW_Discharge.csv';
+              dataLink.click();
             });
             dischargeContainer.addEventListener('mousedown', startDrag);
             function startDrag(e) {
@@ -2447,6 +2419,7 @@ export default {
         map.setCenter([-42.6043, 90]);
         map.setZoom(2);
         map.setCenter([-42.6043, 90]);
+        // //map.scrollZoom.disable()
 
         if (container.contains(GraceVellabel)) {
           container.removeChild(GraceVellabel);
@@ -2545,6 +2518,7 @@ export default {
         map.setCenter([-42.6043, 90]);
         map.setZoom(2);
         map.setCenter([-42.6043, 90]);
+        //map.scrollZoom.disable()
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'visible');
@@ -2612,6 +2586,7 @@ export default {
         map.setCenter([-42.6043, 90]);
         map.setZoom(2);
         map.setCenter([-42.6043, 90]);
+        //map.scrollZoom.disable()
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'none');
@@ -2679,6 +2654,7 @@ export default {
         map.setCenter([-42.6043, 90]);
         map.setZoom(2);
         map.setCenter([-42.6043, 90]);
+        //map.scrollZoom.disable()
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'none');
@@ -2746,6 +2722,7 @@ export default {
         map.setCenter([-42.6043, 90]);
         map.setZoom(2);
         map.setCenter([-42.6043, 90]);
+        //map.scrollZoom.disable()
 
         map.setLayoutProperty('Grace_Vel', 'visibility', 'none');
         map.setLayoutProperty('E_rate', 'visibility', 'none');
@@ -2791,6 +2768,7 @@ export default {
         map.setCenter([-42.6043, 90]);
         map.setZoom(2);
         map.setCenter([-42.6043, 90]);
+        map.scrollZoom.enable()
 
         if (container.contains(GraceVellabel)) {
           container.removeChild(GraceVellabel);
