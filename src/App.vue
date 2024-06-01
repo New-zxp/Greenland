@@ -55,6 +55,344 @@ export default {
         data: './src/data/sw_boundary.json'
       });
 
+      map.addSource('ant-v', {
+  type: 'geojson',
+  data: './src/data/Ant_V.json'
+});
+
+    map.addLayer({
+      id: 'ant-v-circle',  // 将图层ID修改为反映其类型
+      type: 'circle',
+      source: 'ant-v',
+      paint: {
+        'circle-radius': 8,
+        // 使用插值函数将速度属性值映射到一个颜色值范围内
+        'circle-color': [
+          'interpolate',
+          ['linear'],
+          ['get', 'speed'],
+          -15, 'red',
+          0,'white',
+          15, 'blue'
+        ]
+      }
+    });
+
+
+      map.addSource('ap', {
+        type: 'geojson',
+        data: './src/data/ap.json'
+      });
+
+      map.addLayer({
+        id: 'ap-line',
+        type: 'line',
+        source: 'ap',
+        layout: {},
+        'paint': {
+          'line-color': 'red'
+          },
+        });
+
+        map.addSource('wais', {
+        type: 'geojson',
+        data: './src/data/wais.json'
+      });
+
+      map.addLayer({
+        id: 'wais-line',
+        type: 'line',
+        source: 'wais',
+        layout: {},
+        'paint': {
+          'line-color': 'red'
+          },
+        });
+        
+        map.addSource('eais', {
+        type: 'geojson',
+        data: './src/data/eais.json'
+      });
+
+      map.addLayer({
+        id: 'eais-line',
+        type: 'line',
+        source: 'eais',
+        layout: {},
+        'paint': {
+          'line-color': 'red'
+          },
+        });
+
+        map.addSource('ap-series', {
+        type: 'geojson',
+        data: './src/data/ap_time_series.json'
+      });
+
+      map.addSource('wais-series', {
+        type: 'geojson',
+        data: './src/data/wais_time_series.json'
+      });
+
+      map.addSource('eais-series', {
+        type: 'geojson',
+        data: './src/data/eais_time_series.json'
+      });
+
+// 添加填充图层和点击事件处理程序
+function addFillLayer(map, sourceName, layerId, color) {
+    map.addLayer({
+        id: layerId,
+        type: 'fill',
+        source: sourceName,
+        layout: {},
+        paint: {
+            'fill-color': color,
+            'fill-opacity': 0
+        }
+    });
+}
+
+// 添加填充图层
+addFillLayer(map, 'ap', 'ap-fill', 'red');
+addFillLayer(map, 'wais', 'wais-fill', 'blue');
+addFillLayer(map, 'eais', 'eais-fill', 'green');
+
+// 添加点击事件处理程序
+map.on('click', 'ap-fill', function (e) {
+    fetchDataAndCreateTable('ap_time_series.json','AP');
+});
+
+map.on('click', 'wais-fill', function (e) {
+    fetchDataAndCreateTable('wais_time_series.json','WAIS');
+});
+
+map.on('click', 'eais-fill', function (e) {
+    fetchDataAndCreateTable('eais_time_series.json','EAIS');
+});
+
+// 函数：获取数据并创建表格
+function fetchDataAndCreateTable(sourceName,name) {
+    fetch('./src/data/' + sourceName)
+        .then(response => response.json())
+        .then(data => {
+            // 创建表格
+            createEChartsTable(data,sourceName,name);
+        })
+        .catch(error => {
+            console.error('Error fetching data:', error);
+        });
+}
+
+var currentChart = null; // 全局变量用于保存当前的 ECharts 实例
+var chartContainer = null; // 全局变量用于保存当前的 ECharts 容器
+var closeButton = null; // 全局变量用于保存当前的 ECharts 容器
+var downloadButton = null; // 全局变量用于保存当前的 ECharts 容器
+
+// 函数：销毁当前的 ECharts 实例和容器
+function disposeCurrentChart() {
+    if (currentChart) {
+        currentChart.dispose(); // 销毁当前的 ECharts 实例
+        currentChart = null; // 将全局变量置为 null
+    }
+    if (chartContainer && chartContainer.parentNode) {
+        chartContainer.parentNode.removeChild(chartContainer); // 从 DOM 中删除容器元素
+        chartContainer = null; // 将全局变量置为 null
+    }
+}
+
+// 函数：创建 ECharts 表格
+function createEChartsTable(data, sourceName,name) {
+    // 销毁当前的 ECharts 实例和容器
+    disposeCurrentChart();
+
+    var seriesData = [];
+    var xAxisData = [];
+
+    data.features.forEach(feature => {
+    var properties = feature.properties;
+    // 假设属性中有 '时间' 和 'speed' 字段
+    var time = properties['时间'];
+    var speed = properties[name.toLowerCase()]; // 假设 speed 是你想要的属性名
+    // 将时间和 speed 组合成数组，然后加入 seriesData
+    seriesData.push([time, speed]);
+});
+
+
+ // 创建 ECharts 容器
+    chartContainer = document.createElement('div');
+    chartContainer.style.width = '600px'; // 设置表格宽度
+    chartContainer.style.height = '400px'; // 设置表格高度
+    chartContainer.style.left = '720px'; // 设置表格水平居中
+    chartContainer.style.top = '300px'; // 设置表格水平居中
+    chartContainer.style.transform = 'translate(-50%, -50%)'; // 居中显示
+    chartContainer.style.backgroundColor = 'white'; // 设置表格背景颜色
+    chartContainer.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.1)'; // 添加阴影效果
+    document.body.appendChild(chartContainer);
+
+    // 初始化 ECharts 实例
+    var chart = echarts.init(chartContainer);
+
+    // 配置表格
+    var option = {
+        title: {
+            text: name + '冰质量变化时间序列',
+            left: 'center',
+            top: '10px',
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'shadow'
+            }
+        },
+        xAxis: {
+      type: 'value',
+      data: xAxisData,
+      axisLabel: {
+        fontSize: 15,
+        color: '#333',
+      },
+      axisLine: {
+        show: false,
+      },
+      axisTick: {
+        show: false,
+      },
+      min: 2000,  // 设置 x 轴最小值
+    max: 2025,  // 设置 x 轴最大值
+    },
+    yAxis: {
+      type: 'value',
+
+      axisLine: {
+        show: false,
+      },
+      axisTick: {
+        show: false,
+      }
+    },
+    series: [
+      {
+        data: seriesData,
+        type: "scatter",
+        color: 'blue',
+        symbolSize: 5, // 设置点的大小
+      },]
+    };
+
+    // 使用配置项设置 ECharts 图表
+    chart.setOption(option);
+
+    // 将当前的 ECharts 实例保存到全局变量中
+    currentChart = chart;
+
+      // 添加事件监听器和动态样式绑定
+  chartContainer.addEventListener('mousedown', startDrag);
+
+function startDrag(e) {
+  const initialX = e.clientX;
+  const initialY = e.clientY;
+  const initialLeft = chartContainer.offsetLeft; // 获取初始左偏移
+  const initialTop = chartContainer.offsetTop; // 获取初始顶部偏移
+
+  function handleMove(e) {
+    const offsetX = e.clientX - initialX;
+    const offsetY = e.clientY - initialY;
+
+    chartContainer.style.left = initialLeft + offsetX + 'px'; // 设置左偏移
+    chartContainer.style.top = initialTop + offsetY + 'px'; // 设置顶部偏移
+  }
+
+  function handleUp() {
+    window.removeEventListener('mousemove', handleMove);
+    window.removeEventListener('mouseup', handleUp);
+  }
+
+  window.addEventListener('mousemove', handleMove);
+  window.addEventListener('mouseup', handleUp);
+}
+
+    // 添加关闭按钮
+    closeButton  = document.createElement('button');
+    closeButton.textContent = '关闭';
+    closeButton.style.position = 'absolute';
+    closeButton.style.top = '10px';
+    closeButton.style.right = '10px';
+    closeButton.style.height = '30px';
+    closeButton.style.width = '50px';
+    closeButton.style.padding = '5px 10px';
+    closeButton.style.border = 'none';
+    closeButton.style.backgroundColor = '#ddd';
+    closeButton.style.cursor = 'pointer';
+    closeButton.style.transition = 'background-color 0.3s'; // 添加过渡效果
+    // 添加下载按钮
+    downloadButton  = document.createElement('button');
+    downloadButton.textContent = '下载';
+    downloadButton.style.position = 'absolute';
+    downloadButton.style.top = '10px';
+    downloadButton.style.right = '70px';
+    downloadButton.style.height = '30px';
+    downloadButton.style.width = '50px';
+    downloadButton.style.padding = '5px 10px';
+    downloadButton.style.border = 'none';
+    downloadButton.style.backgroundColor = '#ddd';
+    downloadButton.style.cursor = 'pointer';
+    downloadButton.style.transition = 'background-color 0.3s'; // 添加过渡效果
+
+    closeButton.addEventListener('mouseenter', function() {
+        closeButton.style.backgroundColor = '#ccc'; // 鼠标移入时改变颜色
+    });
+
+    closeButton.addEventListener('mouseleave', function() {
+        closeButton.style.backgroundColor = '#ddd'; // 鼠标移出时恢复原来的颜色
+    });
+
+    downloadButton.addEventListener('mouseenter', function() {
+        downloadButton.style.backgroundColor = '#ccc'; // 鼠标移入时改变颜色
+    });
+
+    downloadButton.addEventListener('mouseleave', function() {
+        downloadButton.style.backgroundColor = '#ddd'; // 鼠标移出时恢复原来的颜色
+    });
+
+    closeButton.addEventListener('click', function() {
+        document.body.removeChild(chartContainer);
+        // 销毁当前的 ECharts 实例
+        disposeCurrentChart();
+    });
+
+    async function downloadFile() {
+        const filePath = '/区域时间序列.txt'; // 确保路径正确
+
+        try {
+          const response = await fetch(filePath);
+          if (!response.ok) throw new Error('Network response was not ok');
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = '区域时间序列.txt'; // 设置下载文件的默认名称
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        } catch (error) {
+          console.error('Error downloading file:', error);
+        }
+      }
+
+      downloadButton.addEventListener('click', function() {
+        downloadFile();
+    });
+
+      
+    chartContainer.appendChild(closeButton);
+    chartContainer.appendChild(downloadButton);
+}
+
+
       // 获取地理坐标的像素坐标
       var coordinates = [-65, 58]; // 替换为您想要显示容器的地理坐标
       var pixelCoordinates = map.project(coordinates);
@@ -7670,6 +8008,8 @@ export default {
         map.setLayoutProperty('SMB_rate', 'visibility', 'none');
         map.setLayoutProperty('precipitation_rate', 'visibility', 'none');
         map.setLayoutProperty('gate_meta', 'visibility', 'visible');
+
+
 
       });
 
